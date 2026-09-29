@@ -1365,8 +1365,9 @@ RP_AbrirTelaTISS() {
 
     startedAt := A_TickCount
 
-    ; Atalho esperado: Lançamentos → Monitoração de Faturamento - TISS.
-    Send "{Alt down}lt{Alt up}{Enter}"
+    ; Atalho: Lançamentos → Monitoração de Faturamento - TISS.
+    ; Confirmado contra o MV2000i pelo operador. Spy em Fluxos\Teste_corrigido.ahk L314.
+    Send "{Alt down}lmm{Enter}{Alt up}"
 
     ok := MV_Poll(() => WinExist(WIN_XML), MV_TIMEOUT_LOAD)
     if ok
