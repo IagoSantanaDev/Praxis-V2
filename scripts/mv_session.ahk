@@ -36,6 +36,64 @@ MV_WIN_MOVDOC       := MV_WIN_MOVDOC_ANY
 
 ; ── Controles de popups conhecidos ────────────────────────────
 MV_MODAL_OK_CLASS := "Button1"
+; Título/tipo do modal do Oracle Forms usado para detectar popups abertos.
+MV_FORMS_MODAL    := "Forms ahk_class ui60Modal_W32 ahk_exe ifrun60.EXE"
+; Janela de "Mensagem ao Usuário do MV 2000" (OK de confirmação, Sim/Não de sobrescrita).
+MV_WIN_MSG_USER  := "Mensagem ao Usuário do MV 2000"
+
+; ── Janelas do fluxo de remessa ───────────────────────────────
+MV_WIN_FFCV_DATAS    := "Cadastro: Faturas e Remessas"
+MV_WIN_CAPA_REMESSA  := "Relatório de Atendimentos da Remessa"
+MV_WIN_XML_TISS      := "Monitoração de Faturamento - TISS"
+MV_WIN_XML_PATH_FORM := "MV2000i - Faturamento - [WIN_PRINCIPAL]"
+
+; ── Atalhos de teclado validados ──────────────────────────────
+; Atalho: Lançamentos → Monitoração de Faturamento - TISS.
+; Confirmado contra o MV2000i pelo operador. Spy em Fluxos/Teste_corrigido.ahk L314.
+MV_TISS_ATALHO := "{Alt down}lmm{Enter}{Alt up}"
+; PENDENTE: Esc não sai da tela Entrega de Remessas. Quando descobrir o atalho correto,
+; preencha aqui, ex.: MV_ENTREGA_SAIR_ATALHO := "!x" ou "{F4}".
+MV_ENTREGA_SAIR_ATALHO := "^q"
+
+; ── Controles tela de datas ───────────────────────────────────
+; Spy em Fluxos/Fluxo_FecharRemessa: tela "Cadastro: Faturas e Remessas".
+MV_DATAS_CAMPO_REMESSA    := "Edit5"
+MV_DATAS_CAMPO_REMESSA_X  := 59
+MV_DATAS_CAMPO_REMESSA_Y  := 101
+MV_DATAS_CAMPO_ENTREGA    := "Edit1"
+MV_DATAS_CAMPO_ENTREGA_X  := 146
+MV_DATAS_CAMPO_ENTREGA_Y  := 101
+MV_DATAS_CAMPO_VENCIMENTO := "Edit1"
+MV_DATAS_CAMPO_VENCIMENTO_X := 244
+MV_DATAS_CAMPO_VENCIMENTO_Y := 227
+MV_DATAS_CHECKBOX         := "Button3"
+MV_DATAS_CHECKBOX_X       := 541
+MV_DATAS_CHECKBOX_Y       := 242
+MV_DATAS_BTN_CONFIRMAR    := "Button10"
+MV_DATAS_BTN_CONFIRMAR_X  := 30
+MV_DATAS_BTN_CONFIRMAR_Y  := 426
+MV_DATAS_BTN_VOLTAR       := "Button7"
+
+; ── Controles tela XML ────────────────────────────────────────
+; Spy em Fluxos/Fluxo_XML: tela "Monitoração de Faturamento - TISS".
+MV_XML_CAMPO_REMESSA   := "Edit1"
+MV_XML_CAMPO_REMESSA_X := 272
+MV_XML_CAMPO_REMESSA_Y := 89
+MV_XML_BTN_BUSCAR      := ""        ; consulta continua por F8
+MV_XML_BTN_FATURAMENTO := "Button7"  ; 1 Faturamento
+MV_XML_BTN_FATURAMENTO_X := 12
+MV_XML_BTN_FATURAMENTO_Y := 446
+MV_XML_FORM_CAMPO_PATH   := "Edit1"
+MV_XML_FORM_CAMPO_PATH_X := 267       ; Window Spy: client x dentro do Edit1 do caminho XML
+MV_XML_FORM_CAMPO_PATH_Y := 467       ; Window Spy: client y dentro do Edit1 do caminho XML
+MV_XML_FORM_BTN_SALVAR   := "Button4" ; Salvar_XML / Window Spy: Visualizar XML
+MV_XML_FORM_BTN_SALVAR_X := 623       ; Window Spy: client x do Button4
+MV_XML_FORM_BTN_SALVAR_Y := 471       ; Window Spy: client y do Button4
+MV_XML_BTN_NAO           := "Button2"
+MV_XML_FORM_BTN_VOLTAR   := "Button7" ; Voltar
+MV_XML_FORM_BTN_VOLTAR_X := 731       ; Window Spy: client x do Button7
+MV_XML_FORM_BTN_VOLTAR_Y := 470       ; Window Spy: client y do Button7
+MV_XML_BTN_SAIR_TELA     := ""        ; pendente
 
 ; ── Polling / estabilidade ────────────────────────────────────
 MV_POLL_MS          := 100
@@ -44,6 +102,19 @@ MV_TIMEOUT_ACOE     := 100
 MV_DELAY_INPUT      := 100
 MV_MODULE_STABLE_MS := 600
 MV_TARGET_STABLE_MS := 600
+
+; ── Entrada por teclado/campo Oracle Forms ─────────────────────
+; Padrão validado no macro 11: micro-settle suficiente para estabilidade sem sleeps longos.
+MV_FIELD_FOCUS_SETTLE_MS := 100
+MV_FIELD_CLEAR_SETTLE_MS := 100
+MV_KEY_SETTLE_MS         := 100
+
+; ── Esperas da fase de fechamento/XML ─────────────────────────
+; Esta fase dispara processamentos pesados no Oracle Forms. Evitar avançar apenas
+; porque o clique foi aceito; aguardar janela/modal/cursor estabilizarem.
+MV_FINAL_STABLE_MS             := 800
+MV_FINAL_ACTION_TIMEOUT_MS     := 30000
+MV_XML_QUERY_MIN_WAIT_MS       := 1200
 
 ; ════════════════════════════════════════════════════════════════
 ;  API PÚBLICA
@@ -353,5 +424,214 @@ MV_WaitAnyWindow(titles, timeoutSecs) {
         if A_TickCount > deadline
             return ""
         Sleep MV_POLL_MS
+    }
+}
+
+; ════════════════════════════════════════════════════════════════
+;  CONTRATO DE JANELA, MODAL E ENTRADA
+; ════════════════════════════════════════════════════════════════
+
+MV_PollMs(condFn, timeoutMs, intervalMs := 20) {
+    startedAt := A_TickCount
+    Loop {
+        if condFn()
+            return true
+
+        if (A_TickCount - startedAt >= timeoutMs)
+            return false
+
+        Sleep intervalMs
+    }
+}
+
+MV_FormatDuration(ms) {
+    if (ms < 1000)
+        return ms "ms"
+
+    totalSecs := Round(ms / 1000, 1)
+    if (totalSecs < 60)
+        return totalSecs "s"
+
+    mins := Floor(totalSecs / 60)
+    secs := Round(Mod(totalSecs, 60), 1)
+    return mins "min " secs "s"
+}
+
+MV_Abort(msg) {
+    global gRunning
+    SendToUI(Map("type", "error", "message", msg))
+    gRunning := false
+    return false
+}
+
+MV_ActiveModalTitle() {
+    return WinExist(MV_FORMS_MODAL)
+        ? MV_FORMS_MODAL
+        : ""
+}
+
+MV_EnsureWindowActive(winTitle, timeoutSecs := 3) {
+    if !WinExist(winTitle)
+        return false
+    WinActivate winTitle
+    return MV_Poll(() => WinActive(winTitle), timeoutSecs)
+}
+
+MV_WaitModalGone(timeoutMs := 30000) {
+    startedAt := A_TickCount
+    Loop {
+        if (MV_ActiveModalTitle() = "")
+            return true
+        if (A_TickCount - startedAt >= timeoutMs)
+            return false
+        Sleep MV_POLL_MS
+    }
+}
+
+MV_WaitWindowGone(winTitle, timeoutMs := 30000) {
+    startedAt := A_TickCount
+    Loop {
+        if !WinExist(winTitle) {
+            Sleep MV_KEY_SETTLE_MS
+            return true
+        }
+        if (A_TickCount - startedAt >= timeoutMs)
+            return false
+        Sleep MV_POLL_MS
+    }
+}
+
+MV_WaitOracleSettled(winTitle, stableMs := 800, timeoutMs := 30000) {
+    startedAt := A_TickCount
+    stableSince := 0
+    lastCount := -1
+
+    Loop {
+        modalClear := (MV_ActiveModalTitle() = "")
+        cursorReady := (A_Cursor != "Wait" && A_Cursor != "AppStarting")
+        exists := WinExist(winTitle)
+        count := -1
+
+        if exists {
+            try hwnds := WinGetControlsHwnd(winTitle)
+            catch
+                hwnds := []
+            count := hwnds.Length
+        }
+
+        if (exists && modalClear && cursorReady && count = lastCount) {
+            if (stableSince = 0)
+                stableSince := A_TickCount
+            if (A_TickCount - stableSince >= stableMs)
+                return true
+        } else {
+            stableSince := 0
+            lastCount := count
+        }
+
+        if (A_TickCount - startedAt >= timeoutMs)
+            return false
+
+        Sleep MV_POLL_MS
+    }
+}
+
+MV_ControlAtReady(winTitle, classNN, clientX, clientY, tolerance := 14) {
+    hwnd := MV_FindControlByClientPoint(winTitle, classNN, clientX, clientY, tolerance)
+    if !hwnd
+        return false
+    try return ControlGetEnabled(hwnd)
+    catch
+        return true
+}
+
+MV_SetTextByClickAt(winTitle, x, y, value) {
+    if !MV_EnsureWindowActive(winTitle)
+        return false
+
+    CoordMode("Mouse", "Client")
+    Click(x + 15, y + 8, 1)
+    Sleep MV_FIELD_FOCUS_SETTLE_MS
+    Send("{Home}{Shift down}{End}{Shift up}{Backspace}")
+    Sleep MV_FIELD_CLEAR_SETTLE_MS
+    SendText value
+    Sleep MV_KEY_SETTLE_MS
+    return true
+}
+
+MV_SetTextByClickNoClear(winTitle, x, y, value) {
+    if !MV_EnsureWindowActive(winTitle)
+        return false
+
+    CoordMode("Mouse", "Client")
+    Click(x + 15, y + 8, 1)
+    Sleep MV_FIELD_FOCUS_SETTLE_MS
+    SendText value
+    Sleep MV_KEY_SETTLE_MS
+    return true
+}
+
+MV_ClickModalButtonByText(winTitle, buttonText) {
+    try hwnds := WinGetControlsHwnd(winTitle)
+    catch
+        return false
+
+    for hwnd in hwnds {
+        try ctrlClass := ControlGetClassNN(hwnd)
+        catch
+            continue
+        if (SubStr(ctrlClass, 1, 6) != "Button")
+            continue
+        try text := ControlGetText(hwnd)
+        catch
+            continue
+        if (text = buttonText) {
+            ControlClick hwnd,,,,, "NA"
+            return true
+        }
+    }
+    return false
+}
+
+MV_ModalHasButton(winTitle, buttonText) {
+    try hwnds := WinGetControlsHwnd(winTitle)
+    catch
+        return false
+
+    for hwnd in hwnds {
+        try ctrlClass := ControlGetClassNN(hwnd)
+        catch
+            continue
+        if (SubStr(ctrlClass, 1, 6) != "Button")
+            continue
+        try text := ControlGetText(hwnd)
+        catch
+            continue
+        if (text = buttonText)
+            return true
+    }
+    return false
+}
+
+MV_ClickBySpec(winTitle, classNN, x, y) {
+    if (classNN = "" || classNN = "CLASSNN" || x = "" || y = "")
+        return false
+
+    ; Igual ao teste 12: localizar controle por ClassNN + ponto Client com tolerância 20.
+    if MV_ClickControlAt(winTitle, classNN, x, y, 20)
+        return true
+
+    if !WinExist(winTitle)
+        return false
+
+    try {
+        WinActivate winTitle
+        if !MV_Poll(() => WinActive(winTitle), 3)
+            return false
+        CoordMode("Mouse", "Client")
+        Click(x, y, 1)
+        return true
+    } catch {
+        return false
     }
 }

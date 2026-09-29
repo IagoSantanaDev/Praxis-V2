@@ -24,12 +24,12 @@ WIN_MOVDOC_BAIXA       := MV_WIN_MOVDOC_BAIXA
 WIN_MOVDOC_POPUP       := "Forms ahk_class ui60Modal_W32 ahk_exe ifrun60.EXE"
 ; O popup "Informações da Conta" é embarcado na janela FFCV: o título não muda.
 ; Detectá-lo por controle sentinela dentro de MV_WIN_FFCV_ANY, não por WinTitle próprio.
-WIN_FFCV_DATAS         := "Cadastro: Faturas e Remessas"
-WIN_FFCV_DATAS_OK      := "Mensagem ao Usuário do MV 2000"
-WIN_CAPA_REMESSA       := "Relatório de Atendimentos da Remessa"
-WIN_XML                := "Monitoração de Faturamento - TISS"
-WIN_XML_PATH_FORM      := "MV2000i - Faturamento - [WIN_PRINCIPAL]"
-WIN_XML_POPUP_SIMNAO   := "Mensagem ao Usuário do MV 2000"
+WIN_FFCV_DATAS         := MV_WIN_FFCV_DATAS
+WIN_FFCV_DATAS_OK      := MV_WIN_MSG_USER
+WIN_CAPA_REMESSA       := MV_WIN_CAPA_REMESSA
+WIN_XML                := MV_WIN_XML_TISS
+WIN_XML_PATH_FORM      := MV_WIN_XML_PATH_FORM
+WIN_XML_POPUP_SIMNAO   := MV_WIN_MSG_USER
 
 ; ── Regiões MOV DOC em coordenadas Client ─────────────────────
 ; Não usar EditN como contrato: Oracle Forms renumera Edit1/Edit2/Edit15 conforme estado.
@@ -84,48 +84,10 @@ POPUP_CAMPO_CONTA_X := 298
 POPUP_CAMPO_CONTA_Y := 143
 POPUP_BTN_OK       := "Button1"  ; modal de aviso/erro usa o primeiro Button1
 
-; ── Controles tela de datas ───────────────────────────────────
-; Spy em Fluxos/Fluxo_FecharRemessa: tela "Cadastro: Faturas e Remessas".
-DATAS_CAMPO_REMESSA    := "Edit5"
-DATAS_CAMPO_REMESSA_X  := 59
-DATAS_CAMPO_REMESSA_Y  := 101
-DATAS_CAMPO_ENTREGA    := "Edit1"
-DATAS_CAMPO_ENTREGA_X  := 146
-DATAS_CAMPO_ENTREGA_Y  := 101
-DATAS_CAMPO_VENCIMENTO := "Edit1"
-DATAS_CAMPO_VENCIMENTO_X := 244
-DATAS_CAMPO_VENCIMENTO_Y := 227
-DATAS_CHECKBOX         := "Button3"
-DATAS_CHECKBOX_X       := 541
-DATAS_CHECKBOX_Y       := 242
-DATAS_BTN_CONFIRMAR    := "Button10"
-DATAS_BTN_CONFIRMAR_X  := 30
-DATAS_BTN_CONFIRMAR_Y  := 426
-DATAS_BTN_VOLTAR       := "Button7"
-; PENDENTE: Esc não sai da tela Entrega de Remessas. Quando descobrir o atalho correto,
-; preencha aqui, ex.: RP_ENTREGA_SAIR_ATALHO := "!x" ou "{F4}".
-RP_ENTREGA_SAIR_ATALHO := "^q"
-
-; ── Controles tela XML ────────────────────────────────────────
-; Spy em Fluxos/Fluxo_XML: tela "Monitoração de Faturamento - TISS".
-XML_CAMPO_REMESSA   := "Edit1"
-XML_CAMPO_REMESSA_X := 272
-XML_CAMPO_REMESSA_Y := 89
-XML_BTN_BUSCAR      := ""        ; consulta continua por F8
-XML_BTN_FATURAMENTO := "Button7"  ; 1 Faturamento
-XML_BTN_FATURAMENTO_X := 12
-XML_BTN_FATURAMENTO_Y := 446
-XML_FORM_CAMPO_PATH   := "Edit1"
-XML_FORM_CAMPO_PATH_X := 267       ; Window Spy: client x dentro do Edit1 do caminho XML
-XML_FORM_CAMPO_PATH_Y := 467       ; Window Spy: client y dentro do Edit1 do caminho XML
-XML_FORM_BTN_SALVAR   := "Button4" ; Salvar_XML / Window Spy: Visualizar XML
-XML_FORM_BTN_SALVAR_X := 623       ; Window Spy: client x do Button4
-XML_FORM_BTN_SALVAR_Y := 471       ; Window Spy: client y do Button4
-XML_BTN_NAO           := "Button2"
-XML_FORM_BTN_VOLTAR   := "Button7" ; Voltar
-XML_FORM_BTN_VOLTAR_X := 731       ; Window Spy: client x do Button7
-XML_FORM_BTN_VOLTAR_Y := 470       ; Window Spy: client y do Button7
-XML_BTN_SAIR_TELA     := ""        ; pendente
+; ── Controles tela de datas / XML ─────────────────────────────
+; Constantes promovidas para o contrato compartilhado em mv_session.ahk
+; (prefixo MV_DATAS_* e MV_XML_*), junto com os atalhos MV_ENTREGA_SAIR_ATALHO
+; e MV_XML_BTN_SAIR_TELA. As referências abaixo usam o prefixo MV_ direto.
 
 ; ── Fragmentos/classificação de erros no popup de envio ───────
 ; Modais Oracle Forms não expõem a mensagem pelo Window Spy/WinGetText de forma confiável.
@@ -137,10 +99,11 @@ ERR_CONTA_JA_EM_REMESSA := "já em remessa"
 ERR_TIPO_DIFERENTE     := "tipo diferente"
 
 ; ── Entrada por teclado/campo Oracle Forms ─────────────────────
-; Padrão validado no macro 11: micro-settle suficiente para estabilidade sem sleeps longos.
-RP_FIELD_FOCUS_SETTLE_MS := 100
-RP_FIELD_CLEAR_SETTLE_MS := 100
-RP_KEY_SETTLE_MS         := 100
+; Timing canônico vive em mv_session.ahk (prefixo MV_). Aliases locais mantêm
+; a leitura curta das referências deste arquivo.
+RP_FIELD_FOCUS_SETTLE_MS := MV_FIELD_FOCUS_SETTLE_MS
+RP_FIELD_CLEAR_SETTLE_MS := MV_FIELD_CLEAR_SETTLE_MS
+RP_KEY_SETTLE_MS         := MV_KEY_SETTLE_MS
 
 ; ── Performance FFCV Inserir Conta ─────────────────────────────
 ; Contrato do macro 11: manter popup aberto, reagir ao modal e liberar próxima conta por estado.
@@ -154,9 +117,9 @@ FFCV_CONTA_SUBMIT_TIMEOUT_MS    := 650
 ; ── Esperas da fase de fechamento/XML ─────────────────────────
 ; Esta fase dispara processamentos pesados no Oracle Forms. Evitar avançar apenas
 ; porque o clique foi aceito; aguardar janela/modal/cursor estabilizarem.
-RP_FINAL_STABLE_MS             := 800
-RP_FINAL_ACTION_TIMEOUT_MS     := 30000
-RP_XML_QUERY_MIN_WAIT_MS       := 1200
+RP_FINAL_STABLE_MS             := MV_FINAL_STABLE_MS
+RP_FINAL_ACTION_TIMEOUT_MS     := MV_FINAL_ACTION_TIMEOUT_MS
+RP_XML_QUERY_MIN_WAIT_MS       := MV_XML_QUERY_MIN_WAIT_MS
 
 RunRemessaProtocolo(params) {
     global gRunning
@@ -200,7 +163,7 @@ RunRemessaProtocolo(params) {
         for _, linha in result["linhas"]
             linhasMovDoc.Push(linha)
 
-        Notify("⏱ MOV DOC protocolo " protocolo ": " RP_FormatDuration(A_TickCount - protocolStart) " | " result["linhas"].Length " linha(s)")
+        Notify("⏱ MOV DOC protocolo " protocolo ": " MV_FormatDuration(A_TickCount - protocolStart) " | " result["linhas"].Length " linha(s)")
         Progress(5 + (idx / protocolos.Length) * 40)
     }
     RP_RecordTiming(timings, "MOV DOC consultar, coletar e baixar", stageStart, protocolos.Length " protocolo(s), " linhasMovDoc.Length " linha(s)")
@@ -747,7 +710,7 @@ RP_AbrirConfigurarPopupContas(tipoConta) {
     if !RP_EnsureFFCVActive()
         return RP_Abort("FFCV não ficou ativa antes de clicar em Inserir Conta.")
 
-    if !RP_ClickBySpec(MV_WIN_FFCV_ANY, FFCV_BTN_ADICIONAR, 24, 458)
+    if !MV_ClickBySpec(MV_WIN_FFCV_ANY, FFCV_BTN_ADICIONAR, 24, 458)
         return RP_Abort("Não consegui clicar em Inserir Conta no FFCV.")
 
     popupReady := RP_WaitContaPopupReady(5000)
@@ -755,9 +718,9 @@ RP_AbrirConfigurarPopupContas(tipoConta) {
         return RP_Abort(popupReady["erro"])
     Notify("Popup Informações da Conta detectado em " popupReady["elapsed"] "ms.")
 
-    if RP_ActiveModalTitle() != "" && !RP_FFCVContaPopupVisible() {
-        if !RP_PollMs(() => RP_ActiveModalTitle() = "" || RP_FFCVContaPopupVisible(), 1200)
-            return RP_Abort("Modal apareceu antes do popup de conta e não foi resolvido: " RP_SafeWinGetText(RP_ActiveModalTitle()))
+    if MV_ActiveModalTitle() != "" && !RP_FFCVContaPopupVisible() {
+        if !MV_PollMs(() => MV_ActiveModalTitle() = "" || RP_FFCVContaPopupVisible(), 1200)
+            return RP_Abort("Modal apareceu antes do popup de conta e não foi resolvido: " RP_SafeWinGetText(MV_ActiveModalTitle()))
     }
 
     if !RP_EnsureFFCVActive()
@@ -777,19 +740,6 @@ RP_AbrirConfigurarPopupContas(tipoConta) {
 RP_WaitContaPopupAfterOpen(timeoutSecs := 5) {
     ready := RP_WaitContaPopupReady(timeoutSecs * 1000)
     return ready["ok"]
-}
-
-RP_PollMs(condFn, timeoutMs, intervalMs := 20) {
-    startedAt := A_TickCount
-    Loop {
-        if condFn()
-            return true
-
-        if (A_TickCount - startedAt >= timeoutMs)
-            return false
-
-        Sleep intervalMs
-    }
 }
 
 RP_FFCVContaPopupVisible() {
@@ -823,8 +773,8 @@ RP_WaitContaPopupReady(timeoutMs) {
         if RP_FFCVContaPopupVisible()
             return Map("ok", true, "modal", false, "elapsed", A_TickCount - startedAt, "erro", "")
 
-        if RP_ActiveModalTitle() != "" {
-            if RP_PollMs(() => RP_ActiveModalTitle() = "" || RP_FFCVContaPopupVisible(), Min(800, timeoutMs))
+        if MV_ActiveModalTitle() != "" {
+            if MV_PollMs(() => MV_ActiveModalTitle() = "" || RP_FFCVContaPopupVisible(), Min(800, timeoutMs))
                 continue
             return Map("ok", true, "modal", true, "elapsed", A_TickCount - startedAt, "erro", "")
         }
@@ -860,7 +810,7 @@ RP_WaitReadyForNextAccount(timeoutMs := 1000) {
     startedAt := A_TickCount
 
     Loop {
-        if RP_ActiveModalTitle() != "" {
+        if MV_ActiveModalTitle() != "" {
             result := RP_DismissActiveModal()
             if !result["ok"]
                 return false
@@ -890,7 +840,7 @@ RP_CloseContaPopupAndWait(timeoutMs := 5000) {
 
     startedAt := A_TickCount
     Loop {
-        if (!RP_FFCVContaPopupVisible() && (RP_ActiveModalTitle() = "")) {
+        if (!RP_FFCVContaPopupVisible() && (MV_ActiveModalTitle() = "")) {
             Sleep FFCV_CONTA_STABLE_MS
             return true
         }
@@ -1053,19 +1003,13 @@ RP_WaitContaSubmitOutcome(timeoutMs, submittedConta := "") {
 RP_WaitErrorModalAfterConta(timeoutSecs) {
     deadline := A_TickCount + timeoutSecs * 1000
     Loop {
-        popup := RP_ActiveModalTitle()
+        popup := MV_ActiveModalTitle()
         if (popup != "")
             return popup
         if (A_TickCount > deadline)
             return ""
         Sleep MV_POLL_MS
     }
-}
-
-RP_ActiveModalTitle() {
-    return WinExist("Forms ahk_class ui60Modal_W32 ahk_exe ifrun60.EXE")
-        ? "Forms ahk_class ui60Modal_W32 ahk_exe ifrun60.EXE"
-        : ""
 }
 
 RP_ActiveContaErrorModalTitle() {
@@ -1075,7 +1019,7 @@ RP_ActiveContaErrorModalTitle() {
 }
 
 RP_DismissActiveModal() {
-    popup := RP_ActiveModalTitle()
+    popup := MV_ActiveModalTitle()
     if (popup = "")
         return Map("ok", true, "report", "")
 
@@ -1133,7 +1077,7 @@ ClassificarErroContaModal() {
 }
 
 RP_ErrorTemplateVisible(imagePath, variation := 35) {
-    popup := RP_ActiveModalTitle()
+    popup := MV_ActiveModalTitle()
     return FFCV_ErrorTemplateVisible(imagePath, popup, variation)
 }
 
@@ -1207,7 +1151,7 @@ FinalizarComDatas(dataEntrega, dataVenc) {
 
     startedAt := A_TickCount
     ; Mesmo contrato do teste 12: botão por ClassNN + ponto Client validado.
-    if !RP_ClickBySpec(MV_WIN_FFCV_ANY, FFCV_BTN_ABRIR_DATAS, 464, 458)
+    if !MV_ClickBySpec(MV_WIN_FFCV_ANY, FFCV_BTN_ABRIR_DATAS, 464, 458)
         return Map("ok", false, "erro", "Não consegui clicar em Entregar Remessa.")
 
     if !MV_Poll(() => WinExist(WIN_FFCV_DATAS), MV_TIMEOUT_LOAD)
@@ -1219,71 +1163,71 @@ FinalizarComDatas(dataEntrega, dataVenc) {
         return Map("ok", false, "erro", datas["erro"])
     numRemessa := datas["remessa"]
 
-    checkedFecharContas := MV_ControlCheckedAt(WIN_FFCV_DATAS, DATAS_CHECKBOX, DATAS_CHECKBOX_X, DATAS_CHECKBOX_Y, 20)
+    checkedFecharContas := MV_ControlCheckedAt(WIN_FFCV_DATAS, MV_DATAS_CHECKBOX, MV_DATAS_CHECKBOX_X, MV_DATAS_CHECKBOX_Y, 20)
     if (checkedFecharContas = 0) {
-        if !RP_ClickBySpec(WIN_FFCV_DATAS, DATAS_CHECKBOX, DATAS_CHECKBOX_X, DATAS_CHECKBOX_Y)
+        if !MV_ClickBySpec(WIN_FFCV_DATAS, MV_DATAS_CHECKBOX, MV_DATAS_CHECKBOX_X, MV_DATAS_CHECKBOX_Y)
             return Map("ok", false, "erro", "Não consegui marcar 'Fechar contas sem imprimir faturas'.")
     } else if (checkedFecharContas = "") {
         return Map("ok", false, "erro", "Não consegui ler o estado de 'Fechar contas sem imprimir faturas'.")
     }
     Sleep MV_DELAY_INPUT
 
-    if !RP_ClickBySpec(WIN_FFCV_DATAS, DATAS_BTN_CONFIRMAR, DATAS_BTN_CONFIRMAR_X, DATAS_BTN_CONFIRMAR_Y)
+    if !MV_ClickBySpec(WIN_FFCV_DATAS, MV_DATAS_BTN_CONFIRMAR, MV_DATAS_BTN_CONFIRMAR_X, MV_DATAS_BTN_CONFIRMAR_Y)
         return Map("ok", false, "erro", "Não consegui confirmar a entrega da remessa.")
 
     if !RP_WaitAnyModalOrDelay(MV_TIMEOUT_ACOE)
         return Map("ok", false, "erro", "Popup de confirmação não apareceu.")
     if !RP_ClickNaoModal()
         return Map("ok", false, "erro", "Não consegui clicar Não no popup de confirmação.")
-    if !RP_WaitModalGone(RP_FINAL_ACTION_TIMEOUT_MS)
+    if !MV_WaitModalGone(RP_FINAL_ACTION_TIMEOUT_MS)
         return Map("ok", false, "erro", "Popup de confirmação foi acionado, mas não fechou/estabilizou em tempo.")
 
     if !MV_Poll(() => WinExist(WIN_CAPA_REMESSA), MV_TIMEOUT_LOAD)
         return Map("ok", false, "erro", "Tela de impressão não apareceu.")
-    if !RP_EnsureWindowActive(WIN_CAPA_REMESSA)
+    if !MV_EnsureWindowActive(WIN_CAPA_REMESSA)
         return Map("ok", false, "erro", "Tela de impressão apareceu, mas não ficou ativa para confirmar.")
-    if !RP_WaitOracleSettled(WIN_CAPA_REMESSA, RP_FINAL_STABLE_MS, RP_FINAL_ACTION_TIMEOUT_MS)
+    if !MV_WaitOracleSettled(WIN_CAPA_REMESSA, RP_FINAL_STABLE_MS, RP_FINAL_ACTION_TIMEOUT_MS)
         return Map("ok", false, "erro", "Tela de impressão apareceu, mas não estabilizou antes do Enter.")
 
     Send "{Enter}"
-    if !RP_WaitWindowGone(WIN_CAPA_REMESSA, RP_FINAL_ACTION_TIMEOUT_MS)
+    if !MV_WaitWindowGone(WIN_CAPA_REMESSA, RP_FINAL_ACTION_TIMEOUT_MS)
         return Map("ok", false, "erro", "Enter enviado na tela de impressão, mas ela não fechou em tempo.")
 
-    if !RP_WaitOracleSettled(WIN_FFCV_DATAS, RP_FINAL_STABLE_MS, RP_FINAL_ACTION_TIMEOUT_MS)
+    if !MV_WaitOracleSettled(WIN_FFCV_DATAS, RP_FINAL_STABLE_MS, RP_FINAL_ACTION_TIMEOUT_MS)
         return Map("ok", false, "erro", "Após a impressão, a tela de Entrega de Remessas não estabilizou para sair.")
 
     if !RP_SairTelaEntregaPendente()
-        return Map("ok", false, "erro", "Atalho para sair da tela Entrega de Remessas ainda não mapeado. Preencha RP_ENTREGA_SAIR_ATALHO para continuar até XML.")
-    if !RP_WaitOracleSettled(MV_WIN_FFCV_ANY, RP_FINAL_STABLE_MS, RP_FINAL_ACTION_TIMEOUT_MS)
+        return Map("ok", false, "erro", "Atalho para sair da tela Entrega de Remessas ainda não mapeado. Preencha MV_ENTREGA_SAIR_ATALHO para continuar até XML.")
+    if !MV_WaitOracleSettled(MV_WIN_FFCV_ANY, RP_FINAL_STABLE_MS, RP_FINAL_ACTION_TIMEOUT_MS)
         return Map("ok", false, "erro", "FFCV não estabilizou após sair da tela Entrega de Remessas.")
 
     return Map("ok", true, "remessa", Trim(numRemessa))
 }
 
 RP_SairTelaEntregaPendente() {
-    if (Trim(RP_ENTREGA_SAIR_ATALHO) = "") {
+    if (Trim(MV_ENTREGA_SAIR_ATALHO) = "") {
         Notify("Pendente: atalho para sair da tela Entrega de Remessas ainda não mapeado. Esc foi removido porque não funciona.")
         return false
     }
 
-    if !RP_EnsureWindowActive(WIN_FFCV_DATAS) {
+    if !MV_EnsureWindowActive(WIN_FFCV_DATAS) {
         Notify("Não consegui ativar a tela Entrega de Remessas para enviar o atalho de saída.")
         return false
     }
 
-    Send RP_ENTREGA_SAIR_ATALHO
+    Send MV_ENTREGA_SAIR_ATALHO
     return MV_Poll(() => !WinExist(WIN_FFCV_DATAS), MV_TIMEOUT_ACOE)
 }
 
 RP_PreencherDatasEntregaPorTeclado(dataEntrega, dataVenc) {
-    if !RP_EnsureWindowActive(WIN_FFCV_DATAS)
+    if !MV_EnsureWindowActive(WIN_FFCV_DATAS)
         return Map("ok", false, "erro", "Tela de datas não ficou ativa para preencher entrega/vencimento.", "remessa", "")
 
     ; Contrato validado no teste 12:
     ; ancorar foco em Data de Entrega, Shift+Tab seleciona Remessa, Tab volta
     ; para Data de Entrega, Enter avança para Data Prevista. Não usar Ctrl+A.
     CoordMode("Mouse", "Client")
-    Click(DATAS_CAMPO_ENTREGA_X + 15, DATAS_CAMPO_ENTREGA_Y + 8, 1)
+    Click(MV_DATAS_CAMPO_ENTREGA_X + 15, MV_DATAS_CAMPO_ENTREGA_Y + 8, 1)
     Sleep RP_KEY_SETTLE_MS
 
     Send("+{Tab}")
@@ -1311,7 +1255,7 @@ GerarXML(numRemessa) {
     if !RP_AbrirTelaTISS()
         return RP_Abort("Erro: tela XML/TISS não abriu.")
 
-    if !RP_SetTextByClickNoClear(WIN_XML, XML_CAMPO_REMESSA_X, XML_CAMPO_REMESSA_Y, numRemessa)
+    if !MV_SetTextByClickNoClear(WIN_XML, MV_XML_CAMPO_REMESSA_X, MV_XML_CAMPO_REMESSA_Y, numRemessa)
         return RP_Abort("Não consegui preencher a remessa na tela XML/TISS.")
     Sleep RP_KEY_SETTLE_MS
     Send "{F8}"
@@ -1321,7 +1265,7 @@ GerarXML(numRemessa) {
         return RP_Abort(queryReady["erro"])
     Notify("Consulta XML/TISS estabilizada em " queryReady["elapsed"] "ms.")
 
-    if !RP_ClickBySpec(WIN_XML, XML_BTN_FATURAMENTO, XML_BTN_FATURAMENTO_X, XML_BTN_FATURAMENTO_Y)
+    if !MV_ClickBySpec(WIN_XML, MV_XML_BTN_FATURAMENTO, MV_XML_BTN_FATURAMENTO_X, MV_XML_BTN_FATURAMENTO_Y)
         return RP_Abort("Não consegui acionar o botão Faturamento na tela XML/TISS.")
 
     faturamento := RP_WaitXmlFormOrModal(MV_TIMEOUT_LOAD)
@@ -1334,24 +1278,24 @@ GerarXML(numRemessa) {
 
     xmlPath := xmlDir "\" numRemessa ".xml"
 
-    if !RP_SetTextByClickAt(WIN_XML_PATH_FORM, XML_FORM_CAMPO_PATH_X, XML_FORM_CAMPO_PATH_Y, xmlPath)
+    if !MV_SetTextByClickAt(WIN_XML_PATH_FORM, MV_XML_FORM_CAMPO_PATH_X, MV_XML_FORM_CAMPO_PATH_Y, xmlPath)
         return RP_Abort("Não consegui preencher o campo de caminho do XML.")
 
-    if !RP_WaitOracleSettled(WIN_XML_PATH_FORM, RP_FINAL_STABLE_MS, RP_FINAL_ACTION_TIMEOUT_MS)
+    if !MV_WaitOracleSettled(WIN_XML_PATH_FORM, RP_FINAL_STABLE_MS, RP_FINAL_ACTION_TIMEOUT_MS)
         return RP_Abort("Tela de caminho do XML não estabilizou antes de salvar.")
 
-    if !RP_ClickBySpec(WIN_XML_PATH_FORM, XML_FORM_BTN_SALVAR, XML_FORM_BTN_SALVAR_X, XML_FORM_BTN_SALVAR_Y)
+    if !MV_ClickBySpec(WIN_XML_PATH_FORM, MV_XML_FORM_BTN_SALVAR, MV_XML_FORM_BTN_SALVAR_X, MV_XML_FORM_BTN_SALVAR_Y)
         return RP_Abort("Não consegui acionar o botão Salvar_XML.")
 
     if !RP_HandleXmlSaveModals()
         return false
 
-    if !RP_WaitOracleSettled(WIN_XML_PATH_FORM, RP_FINAL_STABLE_MS, RP_FINAL_ACTION_TIMEOUT_MS)
+    if !MV_WaitOracleSettled(WIN_XML_PATH_FORM, RP_FINAL_STABLE_MS, RP_FINAL_ACTION_TIMEOUT_MS)
         return RP_Abort("Após salvar o XML, a tela não estabilizou para voltar.")
 
-    if !RP_ClickBySpec(WIN_XML_PATH_FORM, XML_FORM_BTN_VOLTAR, XML_FORM_BTN_VOLTAR_X, XML_FORM_BTN_VOLTAR_Y)
+    if !MV_ClickBySpec(WIN_XML_PATH_FORM, MV_XML_FORM_BTN_VOLTAR, MV_XML_FORM_BTN_VOLTAR_X, MV_XML_FORM_BTN_VOLTAR_Y)
         return RP_Abort("Não consegui voltar da tela de XML gerado.")
-    if !RP_WaitOracleSettled(WIN_XML_PATH_FORM, RP_FINAL_STABLE_MS, RP_FINAL_ACTION_TIMEOUT_MS)
+    if !MV_WaitOracleSettled(WIN_XML_PATH_FORM, RP_FINAL_STABLE_MS, RP_FINAL_ACTION_TIMEOUT_MS)
         Notify("Aviso: a tela de XML não confirmou estabilidade após Voltar; tentando sair mesmo assim.")
 
     RP_SairTelaAtual()
@@ -1367,7 +1311,8 @@ RP_AbrirTelaTISS() {
 
     ; Atalho: Lançamentos → Monitoração de Faturamento - TISS.
     ; Confirmado contra o MV2000i pelo operador. Spy em Fluxos\Teste_corrigido.ahk L314.
-    Send "{Alt down}lmm{Enter}{Alt up}"
+    ; Constante canônica em mv_session.ahk: MV_TISS_ATALHO.
+    Send MV_TISS_ATALHO
 
     ok := MV_Poll(() => WinExist(WIN_XML), MV_TIMEOUT_LOAD)
     if ok
@@ -1394,93 +1339,18 @@ RP_CopyFocusedNumericText(timeoutMs := 600) {
     return ""
 }
 
-RP_EnsureWindowActive(winTitle, timeoutSecs := 3) {
-    if !WinExist(winTitle)
-        return false
-    WinActivate winTitle
-    return MV_Poll(() => WinActive(winTitle), timeoutSecs)
-}
-
-RP_WaitModalGone(timeoutMs := 30000) {
-    startedAt := A_TickCount
-    Loop {
-        if (RP_ActiveModalTitle() = "")
-            return true
-        if (A_TickCount - startedAt >= timeoutMs)
-            return false
-        Sleep MV_POLL_MS
-    }
-}
-
-RP_WaitWindowGone(winTitle, timeoutMs := 30000) {
-    startedAt := A_TickCount
-    Loop {
-        if !WinExist(winTitle) {
-            Sleep RP_KEY_SETTLE_MS
-            return true
-        }
-        if (A_TickCount - startedAt >= timeoutMs)
-            return false
-        Sleep MV_POLL_MS
-    }
-}
-
-RP_WaitOracleSettled(winTitle, stableMs := 800, timeoutMs := 30000) {
-    startedAt := A_TickCount
-    stableSince := 0
-    lastCount := -1
-
-    Loop {
-        modalClear := (RP_ActiveModalTitle() = "")
-        cursorReady := (A_Cursor != "Wait" && A_Cursor != "AppStarting")
-        exists := WinExist(winTitle)
-        count := -1
-
-        if exists {
-            try hwnds := WinGetControlsHwnd(winTitle)
-            catch
-                hwnds := []
-            count := hwnds.Length
-        }
-
-        if (exists && modalClear && cursorReady && count = lastCount) {
-            if (stableSince = 0)
-                stableSince := A_TickCount
-            if (A_TickCount - stableSince >= stableMs)
-                return true
-        } else {
-            stableSince := 0
-            lastCount := count
-        }
-
-        if (A_TickCount - startedAt >= timeoutMs)
-            return false
-
-        Sleep MV_POLL_MS
-    }
-}
-
-RP_ControlAtReady(winTitle, classNN, clientX, clientY, tolerance := 14) {
-    hwnd := MV_FindControlByClientPoint(winTitle, classNN, clientX, clientY, tolerance)
-    if !hwnd
-        return false
-    try return ControlGetEnabled(hwnd)
-    catch
-        return true
-}
-
 RP_WaitXmlQueryReady(timeoutMs := 30000) {
     startedAt := A_TickCount
     stableSince := 0
 
     Loop {
-        modal := RP_ActiveModalTitle()
+        modal := MV_ActiveModalTitle()
         if (modal != "")
             return Map("ok", false, "elapsed", A_TickCount - startedAt, "erro", "Modal apareceu após consultar a remessa no XML/TISS: " RP_SafeWinGetText(modal))
 
         minWaitDone := (A_TickCount - startedAt >= RP_XML_QUERY_MIN_WAIT_MS)
         if (minWaitDone
-            && RP_ControlAtReady(WIN_XML, XML_BTN_FATURAMENTO, XML_BTN_FATURAMENTO_X, XML_BTN_FATURAMENTO_Y, 20)
+            && MV_ControlAtReady(WIN_XML, MV_XML_BTN_FATURAMENTO, MV_XML_BTN_FATURAMENTO_X, MV_XML_BTN_FATURAMENTO_Y, 20)
             && A_Cursor != "Wait" && A_Cursor != "AppStarting") {
             if (stableSince = 0)
                 stableSince := A_TickCount
@@ -1497,32 +1367,6 @@ RP_WaitXmlQueryReady(timeoutMs := 30000) {
     }
 }
 
-RP_SetTextByClickAt(winTitle, x, y, value) {
-    if !RP_EnsureWindowActive(winTitle)
-        return false
-
-    CoordMode("Mouse", "Client")
-    Click(x + 15, y + 8, 1)
-    Sleep RP_FIELD_FOCUS_SETTLE_MS
-    Send("{Home}{Shift down}{End}{Shift up}{Backspace}")
-    Sleep RP_FIELD_CLEAR_SETTLE_MS
-    SendText value
-    Sleep RP_KEY_SETTLE_MS
-    return true
-}
-
-RP_SetTextByClickNoClear(winTitle, x, y, value) {
-    if !RP_EnsureWindowActive(winTitle)
-        return false
-
-    CoordMode("Mouse", "Client")
-    Click(x + 15, y + 8, 1)
-    Sleep RP_FIELD_FOCUS_SETTLE_MS
-    SendText value
-    Sleep RP_KEY_SETTLE_MS
-    return true
-}
-
 RP_WaitXmlFormOrModal(timeoutSecs := 20) {
     startedAt := A_TickCount
     deadline := startedAt + timeoutSecs * 1000
@@ -1531,9 +1375,9 @@ RP_WaitXmlFormOrModal(timeoutSecs := 20) {
         if WinExist(WIN_XML_PATH_FORM)
             return Map("ok", true, "erro", "")
 
-        popup := RP_ActiveModalTitle()
+        popup := MV_ActiveModalTitle()
         if (popup != "") {
-            if RP_ClickModalButtonByText(popup, "&OK") {
+            if MV_ClickModalButtonByText(popup, "&OK") {
                 ; Modal pós-1 Faturamento é continuável. Não depender do texto desenhado.
                 MV_Poll(() => !WinExist("ahk_class ui60Modal_W32 ahk_exe ifrun60.EXE"), MV_TIMEOUT_ACOE)
             } else {
@@ -1553,21 +1397,21 @@ RP_HandleXmlSaveModals() {
         if !MV_Poll(() => WinExist("ahk_class ui60Modal_W32 ahk_exe ifrun60.EXE"), 2) {
             if (A_Index = 1)
                 Notify("Nenhum modal apareceu imediatamente após salvar XML; aguardando estabilização da tela.")
-            if RP_WaitOracleSettled(WIN_XML_PATH_FORM, RP_FINAL_STABLE_MS, 5000)
+            if MV_WaitOracleSettled(WIN_XML_PATH_FORM, RP_FINAL_STABLE_MS, 5000)
                 return true
             continue
         }
 
-        popup := RP_ActiveModalTitle()
+        popup := MV_ActiveModalTitle()
 
         ; Modal de sobrescrita: tem Sim e Não. Regra atual: não sobrescrever.
-        if RP_ModalHasButton(popup, "&Sim") && RP_ModalHasButton(popup, "&Não") {
-            if RP_ClickModalButtonByText(popup, "&Não")
+        if MV_ModalHasButton(popup, "&Sim") && MV_ModalHasButton(popup, "&Não") {
+            if MV_ClickModalButtonByText(popup, "&Não")
                 Notify("Modal com Sim/Não respondido com Não.")
             else
                 return RP_Abort("Modal com Sim/Não apareceu, mas não consegui clicar Não.")
-        } else if RP_ModalHasButton(popup, "&OK") {
-            if RP_ClickModalButtonByText(popup, "&OK")
+        } else if MV_ModalHasButton(popup, "&OK") {
+            if MV_ClickModalButtonByText(popup, "&OK")
                 Notify("Modal informativo do XML fechado com OK.")
             else
                 return RP_Abort("Modal com OK apareceu, mas não consegui clicar OK.")
@@ -1581,54 +1425,12 @@ RP_HandleXmlSaveModals() {
     return RP_Abort("XML não estabilizou após salvar e tratar modais.")
 }
 
-RP_ClickModalButtonByText(winTitle, buttonText) {
-    try hwnds := WinGetControlsHwnd(winTitle)
-    catch
-        return false
-
-    for hwnd in hwnds {
-        try ctrlClass := ControlGetClassNN(hwnd)
-        catch
-            continue
-        if (SubStr(ctrlClass, 1, 6) != "Button")
-            continue
-        try text := ControlGetText(hwnd)
-        catch
-            continue
-        if (text = buttonText) {
-            ControlClick hwnd,,,,, "NA"
-            return true
-        }
-    }
-    return false
-}
-
-RP_ModalHasButton(winTitle, buttonText) {
-    try hwnds := WinGetControlsHwnd(winTitle)
-    catch
-        return false
-
-    for hwnd in hwnds {
-        try ctrlClass := ControlGetClassNN(hwnd)
-        catch
-            continue
-        if (SubStr(ctrlClass, 1, 6) != "Button")
-            continue
-        try text := ControlGetText(hwnd)
-        catch
-            continue
-        if (text = buttonText)
-            return true
-    }
-    return false
-}
-
 RP_ClickNaoModal() {
     if WinExist(WIN_XML_POPUP_SIMNAO)
-        return MV_ClickFirstControl(WIN_XML_POPUP_SIMNAO, XML_BTN_NAO)
-    popup := RP_ActiveModalTitle()
+        return MV_ClickFirstControl(WIN_XML_POPUP_SIMNAO, MV_XML_BTN_NAO)
+    popup := MV_ActiveModalTitle()
     if (popup != "")
-        return MV_ClickFirstControl(popup, XML_BTN_NAO)
+        return MV_ClickFirstControl(popup, MV_XML_BTN_NAO)
     return false
 }
 
@@ -1636,32 +1438,6 @@ RP_SairTelaAtual() {
     Send "{Esc}"
     Sleep MV_DELAY_INPUT
     return true
-}
-
-RP_ClickBySpec(winTitle, classNN, x, y) {
-    if !RP_RequireClientControl(classNN, x, y, "botão")
-        return false
-
-    ; Igual ao teste 12: localizar controle por ClassNN + ponto Client com tolerância 20.
-    if MV_ClickControlAt(winTitle, classNN, x, y, 20)
-        return true
-
-    if !WinExist(winTitle)
-        return false
-
-    try {
-        WinActivate winTitle
-        if !MV_Poll(() => WinActive(winTitle), 3)
-            return false
-        CoordMode("Mouse", "Client")
-        Click(x, y, 1)
-        return true
-    } catch {
-        return false
-    }
-}
-RP_RequireClientControl(classNN, x, y, label) {
-    return !(classNN = "" || classNN = "CLASSNN" || x = "" || y = "")
 }
 
 RP_SetControlText(winTitle, classNN, value, label) {
@@ -1696,38 +1472,20 @@ ContarContas(protocolContas) {
 RP_RecordTiming(timings, label, startedAt, extra := "") {
     elapsedMs := A_TickCount - startedAt
     timings.Push(Map("label", label, "ms", elapsedMs, "extra", extra))
-    Notify("⏱ " label ": " RP_FormatDuration(elapsedMs) (extra != "" ? " | " extra : ""))
+    Notify("⏱ " label ": " MV_FormatDuration(elapsedMs) (extra != "" ? " | " extra : ""))
     return elapsedMs
-}
-
-RP_FormatDuration(ms) {
-    if (ms < 1000)
-        return ms "ms"
-
-    totalSecs := Round(ms / 1000, 1)
-    if (totalSecs < 60)
-        return totalSecs "s"
-
-    mins := Floor(totalSecs / 60)
-    secs := Round(Mod(totalSecs, 60), 1)
-    return mins "min " secs "s"
 }
 
 RP_FormatTimingReport(timings) {
     report := "⏱ Tempos da execução:`n"
     for _, item in timings {
         extra := item["extra"] != "" ? " | " item["extra"] : ""
-        report .= "  - " item["label"] ": " RP_FormatDuration(item["ms"]) extra "`n"
+        report .= "  - " item["label"] ": " MV_FormatDuration(item["ms"]) extra "`n"
     }
     return report
 }
 
-RP_Abort(msg) {
-    global gRunning
-    SendToUI(Map("type", "error", "message", msg))
-    gRunning := false
-    return false
-}
+RP_Abort(msg) => MV_Abort(msg)
 
 Notify(msg) => SendToUI(Map("type", "log", "message", msg))
 Progress(v) {
