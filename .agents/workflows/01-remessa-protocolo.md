@@ -166,15 +166,17 @@ Só roda quando `data_entrega` **e** `data_vencimento` vieram preenchidas.
 |------|----------|
 | `FFCV_BTN_*` (`CLASSNN`) | placeholders. Não mapear sem nova captura de Window Spy. |
 
-## Saída de tela ao fim do fluxo
+## Saída de tela
 
-`RP_RecuperarTelas()` roda num `try/finally` no fim de `RunRemessaProtocolo`, inclusive nos
-caminhos de erro. Ela volta o FFCV ao menu e fecha a última tela com `MV_SAIR_TELA_ATALHO`.
+Dois `Ctrl+Q` (`MV_SAIR_TELA_ATALHO`), em pontos fixos do fluxo:
 
-Duas condições em que ela **não** fecha o MV:
+1. **Depois de coletar as contas no MOV DOC e antes de passar ao FFCV** — fecha a tela de baixa.
+   Precisa vir antes de `MV_EnsureFFCV`, que ativa o FFCV e tornaria o `Ctrl+Q` ambíguo entre as
+   duas janelas.
+2. **No fim do fluxo, já no FFCV** — fecha a última tela.
 
-- popup do MV aberto — a mensagem precisa ser lida pelo operador;
-- não há mais nada a fechar (a janela do módulo já não existe).
+Ambos usam `MV_FecharUltimaTela`, que **não** fecha se houver popup do MV aberto: a mensagem
+precisa ser lida pelo operador.
 
 `WinClose` nunca é usado no Oracle Forms: fecha-se por teclado ou por botão.
 
