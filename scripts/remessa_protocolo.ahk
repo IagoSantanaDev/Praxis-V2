@@ -178,7 +178,15 @@ RunRemessaProtocolo(params) {
     ; Contas coletadas no MOV DOC: fechar a tela de baixa antes de passar ao FFCV.
     ; Precisa vir antes de MV_EnsureFFCV, que ativa o FFCV e tornaria o Ctrl+Q ambíguo
     ; entre as duas janelas.
-    MV_FecharUltimaTela(MV_WIN_MOVDOC_BAIXA, "MOV DOC (tela de baixa)")
+    ;
+    ; Usa MV_WIN_MOVDOC_ANY (a raiz) e não MV_WIN_MOVDOC_BAIXA: o nome da tela de
+    ; baixa aparece ENTRE COLCHETES no título da raiz MDI, e com
+    ; SetTitleMatchMode 2 o WinExist resolve para a raiz — o Ctrl+Q é processado
+    ; pela child, então ativar a raiz não a fecha. É o mesmo motivo pelo qual a
+    ; saída do FFCV (MV_WIN_FFCV_ANY) funciona. MV_WIN_MOVDOC_BAIXA continua
+    ; correto para espera e clique na tela, e por isso não foi alterado.
+    ; docs/analise-causa-raiz/04-remessa-protocolo-ctrl-q-nao-sai.md
+    MV_FecharUltimaTela(MV_WIN_MOVDOC_ANY, "MOV DOC (tela de baixa)")
 
     stageStart := A_TickCount
     Notify("Garantindo FFCV...")
