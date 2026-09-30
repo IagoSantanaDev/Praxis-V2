@@ -537,12 +537,65 @@ MV_FecharUltimaTela(winTitle, rotulo) {
         return false
     }
 
-    Send MV_SAIR_TELA_ATALHO
-    if !MV_WaitOracleSettled(winTitle, MV_FINAL_STABLE_MS, MV_FINAL_ACTION_TIMEOUT_MS)
-        MV_LogSaidaTela(rotulo, MV_SAIR_TELA_ATALHO " enviado, mas a janela não confirmou estabilidade.")
+    ; Assinatura ANTES do atalho. O MV reaproveita o mesmo HWND ao trocar de
+    ; tela, então a única prova de que a saída funcionou é a assinatura ter
+    ; mudado — ou a janela ter sumido. Sem isto, uma tecla engolida produz uma
+    ; tela "perfeitamente estável" e era reportada como sucesso.
+    assinaturaAntes := MV_ScreenSignature(winTitle)
+    MV_LogSaidaTela(rotulo, "assinatura antes: " assinaturaAntes)
 
-    MV_LogSaidaTela(rotulo, MV_SAIR_TELA_ATALHO " enviado.")
+    Send MV_SAIR_TELA_ATALHO
+
+    if !MV_WaitTelaSaiu(winTitle, assinaturaAntes, MV_FINAL_STABLE_MS, MV_FINAL_ACTION_TIMEOUT_MS) {
+        MV_LogSaidaTela(rotulo, MV_SAIR_TELA_ATALHO " enviado, mas a tela NÃO mudou"
+            " (assinatura depois: " MV_ScreenSignature(winTitle) "). O atalho não teve efeito.")
+        return false
+    }
+
+    MV_LogSaidaTela(rotulo, MV_SAIR_TELA_ATALHO " enviado e a tela mudou de verdade.")
     return true
+}
+
+; Identifica a tela ativa. O título entra porque é ele que muda quando o MV
+; troca de tela no mesmo HWND; a contagem de controles, sozinha, não distingue
+; "a tela mudou" de "nada aconteceu". Espelha o ActiveScreenSignature do fluxo
+; validado. docs/analise-causa-raiz/04-remessa-protocolo-ctrl-q-nao-sai.md
+MV_ScreenSignature(winTitle) {
+    hwnd := WinExist(winTitle)
+    if !hwnd
+        return "(janela ausente)"
+
+    try titulo := WinGetTitle("ahk_id " hwnd)
+    catch
+        titulo := ""
+    try classe := WinGetClass("ahk_id " hwnd)
+    catch
+        classe := ""
+    try hwnds := WinGetControlsHwnd("ahk_id " hwnd)
+    catch
+        hwnds := []
+
+    return hwnd "|" classe "|" titulo "|" hwnds.Length
+}
+
+; Espera a tela realmente sair. Sucesso = a janela sumiu OU a assinatura mudou.
+; Estabilidade com a assinatura intacta NÃO é sucesso: é justamente o estado em
+; que a tecla foi engolida, e é por isso que ela não basta.
+MV_WaitTelaSaiu(winTitle, assinaturaAntes, stableMs := 800, timeoutMs := 30000) {
+    startedAt := A_TickCount
+
+    Loop {
+        if !WinExist(winTitle)
+            return true
+
+        if (MV_ScreenSignature(winTitle) != assinaturaAntes)
+            return true
+
+        if (A_TickCount - startedAt >= timeoutMs)
+            return false
+
+        Sleep MV_POLL_MS
+    }
 }
 
 MV_LogSaidaTela(rotulo, detalhe) {
