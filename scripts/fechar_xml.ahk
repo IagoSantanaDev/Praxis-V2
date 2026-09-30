@@ -334,8 +334,7 @@ FX_ClassificarRecusa(remessa) {
 }
 
 FX_SairTelaEntrega() {
-    ; O atalho ^q está preenchido mas NÃO validado contra o MV2000i. Esc foi descartado
-    ; porque não sai da tela. Sem o atalho, a recuperação só registra e segue.
+    ; Ctrl+Q confirmado pelo operador para todas as telas do MV.
     if (Trim(MV_ENTREGA_SAIR_ATALHO) = "") {
         Notify("PENDENTE: atalho de saída da tela de entrega não mapeado (MV_ENTREGA_SAIR_ATALHO vazio).")
         return false
@@ -413,9 +412,7 @@ FX_GerarXml(remessa) {
     if !MV_WaitOracleSettled(MV_WIN_XML_PATH_FORM, MV_FINAL_STABLE_MS, MV_FINAL_ACTION_TIMEOUT_MS)
         Notify("Aviso: a tela de XML da remessa " remessa " não confirmou estabilidade após Voltar; saindo mesmo assim.")
 
-    ; PENDENTE: MV_XML_BTN_SAIR_TELA continua vazio — o atalho correto nunca foi descoberto.
-    ; A saída usa {Esc}, como no workflow 01.
-    Send "{Esc}"
+    Send MV_XML_BTN_SAIR_TELA
     Sleep MV_DELAY_INPUT
 
     if !FileExist(xmlPath)
@@ -599,9 +596,8 @@ FX_RecuperarTelas() {
         }
 
         if WinExist(MV_WIN_XML_TISS) {
-            ; PENDENTE: MV_XML_BTN_SAIR_TELA está vazio; a saída provisória é {Esc}.
-            Notify("Recuperação: {Esc} na tela XML/TISS.")
-            Send "{Esc}"
+            Notify("Recuperação: saída da tela XML/TISS por " MV_XML_BTN_SAIR_TELA ".")
+            Send MV_XML_BTN_SAIR_TELA
             Sleep MV_DELAY_INPUT
         }
 

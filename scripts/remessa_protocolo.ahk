@@ -1196,17 +1196,17 @@ FinalizarComDatas(dataEntrega, dataVenc) {
     if !MV_WaitOracleSettled(WIN_FFCV_DATAS, RP_FINAL_STABLE_MS, RP_FINAL_ACTION_TIMEOUT_MS)
         return Map("ok", false, "erro", "Após a impressão, a tela de Entrega de Remessas não estabilizou para sair.")
 
-    if !RP_SairTelaEntregaPendente()
-        return Map("ok", false, "erro", "Atalho para sair da tela Entrega de Remessas ainda não mapeado. Preencha MV_ENTREGA_SAIR_ATALHO para continuar até XML.")
+    if !RP_SairTelaEntrega()
+        return Map("ok", false, "erro", "Ctrl+Q não fechou a tela de Entrega de Remessas. Sem essa saída o fluxo não consegue chegar ao XML.")
     if !MV_WaitOracleSettled(MV_WIN_FFCV_ANY, RP_FINAL_STABLE_MS, RP_FINAL_ACTION_TIMEOUT_MS)
         return Map("ok", false, "erro", "FFCV não estabilizou após sair da tela Entrega de Remessas.")
 
     return Map("ok", true, "remessa", Trim(numRemessa))
 }
 
-RP_SairTelaEntregaPendente() {
+RP_SairTelaEntrega() {
     if (Trim(MV_ENTREGA_SAIR_ATALHO) = "") {
-        Notify("Pendente: atalho para sair da tela Entrega de Remessas ainda não mapeado. Esc foi removido porque não funciona.")
+        Notify("Atalho para sair da tela Entrega de Remessas (MV_ENTREGA_SAIR_ATALHO) está vazio.")
         return false
     }
 
@@ -1435,7 +1435,7 @@ RP_ClickNaoModal() {
 }
 
 RP_SairTelaAtual() {
-    Send "{Esc}"
+    Send MV_XML_BTN_SAIR_TELA
     Sleep MV_DELAY_INPUT
     return true
 }

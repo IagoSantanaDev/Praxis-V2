@@ -51,9 +51,9 @@ MV_WIN_XML_PATH_FORM := "MV2000i - Faturamento - [WIN_PRINCIPAL]"
 ; Atalho: Lançamentos → Monitoração de Faturamento - TISS.
 ; Confirmado contra o MV2000i pelo operador. Spy em Fluxos/Teste_corrigido.ahk L314.
 MV_TISS_ATALHO := "{Alt down}lmm{Enter}{Alt up}"
-; PENDENTE: "^q" está preenchido mas NUNCA foi validado contra o MV2000i real.
-; Esc foi descartado porque não sai da tela. Não troque este valor por coordenada adivinhada.
-; Se a tela de Entrega de Remessas não fechar, isso quebra o fluxo a partir daqui.
+; Saída da tela Entrega de Remessas. Confirmado pelo operador: Ctrl+Q.
+; Em AHK, "^q" é a notação de Ctrl+Q — o valor não precisa de coordenada nem de ajuste.
+; Esc foi descartado porque não sai desta tela.
 MV_ENTREGA_SAIR_ATALHO := "^q"
 
 ; ── Controles tela de datas ───────────────────────────────────
@@ -98,9 +98,9 @@ MV_XML_BTN_NAO           := "Button2"
 MV_XML_FORM_BTN_VOLTAR   := "Button7" ; Voltar
 MV_XML_FORM_BTN_VOLTAR_X := 731       ; Window Spy: client x do Button7
 MV_XML_FORM_BTN_VOLTAR_Y := 470       ; Window Spy: client y do Button7
-; PENDENTE: vazio. O atalho correto de saída da tela TISS nunca foi descoberto; hoje os
-; fluxos saem com {Esc}, que funciona mas não foi validado contra o MV2000i real.
-MV_XML_BTN_SAIR_TELA     := ""
+; Saída de tela no MV2000i. Confirmado pelo operador: Ctrl+Q vale para TODAS as telas do MV.
+; Em AHK, "^q" é a notação de Ctrl+Q — o valor não precisa de coordenada nem de ajuste.
+MV_XML_BTN_SAIR_TELA     := "^q"
 
 ; ── Polling / estabilidade ────────────────────────────────────
 MV_POLL_MS          := 100

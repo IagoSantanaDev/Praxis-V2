@@ -844,10 +844,10 @@ PR_BaixarProtocolo(protocolo) {
     Send "{F10}"
     Sleep PR_DELAY_INPUT
 
-    ; ^q + Enter: fecha a tela de baixa e confirma. NUNCA usar WinClose no Forms.
-    Send "^q"
+    ; Ctrl+Q + Enter: fecha a tela de baixa e confirma. NUNCA usar WinClose no Forms.
+    Send MV_XML_BTN_SAIR_TELA
     if !PR_EsperarJanelaEstavel(MV_WIN_MOVDOC_ANY, PR_FINAL_STABLE_MS, PR_FINAL_TIMEOUT_MS)
-        Notify("Aviso: o MOV DOC não estabilizou após o ^q da baixa do protocolo " protocolo ".")
+        Notify("Aviso: o MOV DOC não estabilizou após o Ctrl+Q da baixa do protocolo " protocolo ".")
     Send "{Enter}"
     Sleep PR_DELAY_INPUT
 
@@ -900,10 +900,10 @@ PR_CorrigirSetorDaContaEBaixar(cfg, conta, setorRecebido) {
 
     Notify("Conta " conta ": protocolo novo copiado do registro de envio: " protocoloNovo ".")
 
-    ; ^q para devolver o MOV DOC ao menu antes da baixa.
-    Send "^q"
+    ; Ctrl+Q para devolver o MOV DOC ao menu antes da baixa.
+    Send MV_XML_BTN_SAIR_TELA
     if !PR_EsperarJanelaEstavel(MV_WIN_MOVDOC_ANY, PR_FINAL_STABLE_MS, PR_FINAL_TIMEOUT_MS)
-        Notify("Aviso: o MOV DOC não estabilizou após o ^q da correção de setor da conta " conta ".")
+        Notify("Aviso: o MOV DOC não estabilizou após o Ctrl+Q da correção de setor da conta " conta ".")
 
     if !PR_BaixarProtocolo(protocoloNovo)
         return PR_Erro("Conta " conta ": não consegui baixar o protocolo novo " protocoloNovo ".")
@@ -969,9 +969,9 @@ PR_Fase5Finalizar(cfg) {
         return true
     }
 
-    Send "^q"
+    Send MV_XML_BTN_SAIR_TELA
     if !PR_EsperarJanelaEstavel(MV_WIN_MOVDOC_ANY, PR_FINAL_STABLE_MS, PR_FINAL_TIMEOUT_MS)
-        Notify("Aviso: o MOV DOC não estabilizou após o ^q final.")
+        Notify("Aviso: o MOV DOC não estabilizou após o Ctrl+Q final.")
 
     Notify("Relatório de registro de envio impresso e MOV DOC fechado.")
     return true
