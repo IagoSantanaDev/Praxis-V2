@@ -34,6 +34,15 @@ logs/
 *.swo
 Fluxos/
 
+# Material de referencia do TO-DO: versiona-se apenas os .ahk validados.
+# As capturas sao evidencia local do operador (1.7 MB) e os .txt viraram
+# docs/analise-causa-raiz/. Nao versionar.
+Praxis_TO-DO.zip
+Praxis_TO-DO/**/*.png
+Praxis_TO-DO/**/*.txt
+Praxis_TO-DO/**/log.txt
+Praxis_TO-DO/**/Erro.txt
+
 # Configuração local e credenciais
 .env
 .env.*
