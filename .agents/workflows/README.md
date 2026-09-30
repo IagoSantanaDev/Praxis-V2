@@ -59,8 +59,8 @@ código agora corresponde.
 | Nome citado nos specs | Onde está |
 |------------------------|----------|
 | `MV_TISS_ATALHO` | `scripts/mv_session.ahk` — constante, com o valor confirmado pelo operador |
-| `MV_ENTREGA_SAIR_ATALHO` | `scripts/mv_session.ahk` — `^q` (Ctrl+Q), confirmado |
-| `MV_XML_BTN_SAIR_TELA` | `scripts/mv_session.ahk` — `^q` (Ctrl+Q), confirmado |
+| `MV_SAIR_TELA_ATALHO` | `scripts/mv_session.ahk` — `^q` (Ctrl+Q), confirmado. Substituiu as duas constantes antigas |
+| `MV_FecharUltimaTela` | `scripts/mv_session.ahk` — saída obrigatória do fim do fluxo |
 | `MV_WaitOracleSettled`, `MV_EnsureWindowActive`, `MV_ClickBySpec`, `MV_SetTextByClickAt` | `scripts/mv_session.ahk` |
 | `MV_Abort` | `scripts/mv_session.ahk` — `RP_Abort` virou wrapper de uma linha |
 

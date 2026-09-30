@@ -122,7 +122,7 @@ Só roda quando `data_entrega` **e** `data_vencimento` vieram preenchidas.
 4. Confirmar: `MV_DATAS_BTN_CONFIRMAR` (`Button10`, 30, 426).
 5. Modal de confirmação → clicar **Não** (`RP_ClickNaoModal`).
 6. Tela de impressão (`MV_WIN_CAPA_REMESSA`) → `MV_WaitOracleSettled` → `{Enter}` → esperar fechar.
-7. Sair da tela de Entrega: `MV_ENTREGA_SAIR_ATALHO` (`^q` = Ctrl+Q, confirmado), depois estabilizar o FFCV.
+7. Sair da tela de Entrega: `MV_SAIR_TELA_ATALHO` (`^q` = Ctrl+Q, confirmado), depois estabilizar o FFCV.
 
 ### Fase 4 — Gerar XML (`GerarXML`)
 
@@ -138,7 +138,7 @@ Só roda quando `data_entrega` **e** `data_vencimento` vieram preenchidas.
 6. Preencher caminho → estabilizar → `XML_FORM_BTN_SALVAR` (`Button4`, 623, 471).
 7. `RP_HandleXmlSaveModals`, até 5 rodadas: modal com `&Sim`+`&Não` → **Não** (política: não
    sobrescrever); modal só com `&OK` → `&OK`. Sem botão seguro → abortar.
-8. Estabilizar → `XML_FORM_BTN_VOLTAR` (`Button7`, 731, 470) → `RP_SairTelaAtual` (`MV_XML_BTN_SAIR_TELA` = Ctrl+Q).
+8. Estabilizar → `XML_FORM_BTN_VOLTAR` (`Button7`, 731, 470) → `RP_SairTelaAtual` (`MV_SAIR_TELA_ATALHO` = Ctrl+Q).
 
 ## Idempotência e recuperação
 
@@ -164,8 +164,19 @@ Só roda quando `data_entrega` **e** `data_vencimento` vieram preenchidas.
 
 | Item | Situação |
 |------|----------|
-| `MV_XML_BTN_SAIR_TELA` | `^q` (Ctrl+Q), confirmado pelo operador para todas as telas do MV. |
 | `FFCV_BTN_*` (`CLASSNN`) | placeholders. Não mapear sem nova captura de Window Spy. |
+
+## Saída de tela ao fim do fluxo
+
+`RP_RecuperarTelas()` roda num `try/finally` no fim de `RunRemessaProtocolo`, inclusive nos
+caminhos de erro. Ela volta o FFCV ao menu e fecha a última tela com `MV_SAIR_TELA_ATALHO`.
+
+Duas condições em que ela **não** fecha o MV:
+
+- popup do MV aberto — a mensagem precisa ser lida pelo operador;
+- não há mais nada a fechar (a janela do módulo já não existe).
+
+`WinClose` nunca é usado no Oracle Forms: fecha-se por teclado ou por botão.
 
 ## Não validado
 

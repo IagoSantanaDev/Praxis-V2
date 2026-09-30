@@ -22,10 +22,15 @@ as regras abaixo seriam as únicas carregadas automaticamente.
   chama `RP_*` nem `PR_*`. Helper compartilhado novo sobe para `mv_session.ahk` com prefixo `MV_`.
 - **Automação do MV só está validada depois de rodar contra o MV2000i real.** Se você não rodou,
   diga isso explicitamente em vez de afirmar que funciona. `PENDENTE` significa `PENDENTE`.
-- **Sair de tela no MV é Ctrl+Q.** Confirmado pelo operador para **todas** as telas. Em AHK, `^` é
-  Ctrl, então `^q` **é** Ctrl+Q — não é um valor suspeito nem falta mapear. Ambas as constantes
-  (`MV_ENTREGA_SAIR_ATALHO` e `MV_XML_BTN_SAIR_TELA`) valem `^q`. `{Esc}` foi descartado. Não
-  "conserte" nenhuma das duas.
+- **Sair de tela no MV é Ctrl+Q.** Confirmado pelo operador para **todas** as telas; no menu
+  principal fecha o MV. Em AHK `^` é Ctrl, então `^q` **é** Ctrl+Q — não é valor suspeito. Uma
+  constante só: `MV_SAIR_TELA_ATALHO`. `{Esc}` foi descartado. Não "conserte" por adivinhação.
+- **Todo fim de fluxo fecha a última tela**, via `MV_FecharUltimaTela`. Duas exceções: popup do MV
+  aberto (não fechar — o operador precisa ler a mensagem) e `imprimir_salvar_envio = Não` no
+  protocolar (o spec manda deixar o MOV DOC aberto para conferência).
+- **Recuperação de tela no meio do fluxo não fecha o MV.** No `protocolar`,
+  `PR_FecharPendencias()` limpa telas auxiliares; `PR_RecuperarTelas(cfg)` fecha o MV e só pode ser
+  chamada no fim. Fechar o MV no meio quebra a execução.
 - **`{Down 121}` em `protocolar.ahk` é posicional** e depende da ordenação do relatório na estação
   do hospital. Se mudar lá, o fluxo gera a planilha errada sem erro visível.
 

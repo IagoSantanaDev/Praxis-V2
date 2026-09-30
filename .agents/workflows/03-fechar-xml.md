@@ -66,13 +66,13 @@ Idêntica à Fase 3 do workflow 01, com duas diferenças:
 Preencher entrega/vencimento por teclado, na ordem validada, **sem Ctrl+A**: clicar em Data de
 Entrega → `{+Tab}` (confere o nº) → `{Tab}` → `SendText dataEntrega` → `{Enter}` →
 `SendText dataVenc`. Marcar o checkbox, `MV_DATAS_BTN_CONFIRMAR`, responder **Não** ao modal de
-confirmação, `{Enter}` na capa de impressão, e sair com `MV_ENTREGA_SAIR_ATALHO`.
+confirmação, `{Enter}` na capa de impressão, e sair com `MV_SAIR_TELA_ATALHO`.
 
 ### Fase 3 — Gerar o XML
 
 Idêntica à Fase 4 do workflow 01: `MV_TISS_ATALHO` → campo remessa → `{F8}` →
 `MV_WaitOracleSettled` → `MV_XML_BTN_FATURAMENTO` → caminho `<gWorkDir>\XML\<remessa>.xml` →
-`MV_XML_FORM_BTN_SALVAR` → modais → `MV_XML_FORM_BTN_VOLTAR` → `MV_XML_BTN_SAIR_TELA`.
+`MV_XML_FORM_BTN_SALVAR` → modais → `MV_XML_FORM_BTN_VOLTAR` → `MV_SAIR_TELA_ATALHO`.
 
 **Antes de gerar**, checar se o arquivo já existe. Se existir, **pular esta remessa** e logar
 `XML já existe, não sobrescrito`. É a mesma política do modal de substituição, que já responde
@@ -104,9 +104,19 @@ menu, então **não** use "a janela sumiu" como prova isolada de que a entrega t
 
 | Item | Situação |
 |------|----------|
-| `MV_XML_BTN_SAIR_TELA` | `^q` (Ctrl+Q), confirmado pelo operador. Antes usava `{Esc}`. |
 | Saída da Manutenção de Remessa | **não mapeada em lugar nenhum do projeto.** Ao voltar ao menu o Forms pode reabrir a tela; se o `finally` não conseguir sair, o operador precisa fechar a tela à mão antes da próxima execução. Não há constante para ela. |
 | Referência OCR de "remessa já fechada" | não existe em `lib/FFCV_ErrorReferences.json`. Ver "Não validado" abaixo. |
+
+## Saída de tela ao fim do fluxo
+
+Duas camadas distintas, e confundi-las quebra o fluxo:
+
+- **Por remessa:** `FX_RecuperarTelas()` roda dentro do laço e devolve o FFCV ao menu, para a
+  próxima iteração reabrir a tela de entrega de um estado limpo.
+- **No fim do fluxo:** `MV_FecharUltimaTela(MV_WIN_FFCV_ANY, "FFCV")` fecha a última tela.
+
+O `Ctrl+Q` (`MV_SAIR_TELA_ATALHO`, confirmado) não é enviado quando há popup do MV aberto: a
+mensagem precisa ser lida pelo operador.
 
 ## Não validado
 

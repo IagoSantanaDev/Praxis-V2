@@ -147,6 +147,20 @@ Correção de OCR: se o setor lido tem **o mesmo tamanho** do `setor_envio` conf
    Se `Não`: **parar aqui**, antes do `Alt+1` — o registro em branco fica excluído e o MOV DOC
    aberto.
 
+## Saída de tela ao fim do fluxo
+
+`PR_RecuperarTelas(cfg)` roda nos dois caminhos (sucesso e erro) e fecha a última tela com
+`MV_SAIR_TELA_ATALHO` (`^q` = Ctrl+Q, confirmado). O `^q` da Fase 5 é outro nível: ele devolve o
+MOV DOC ao menu; o da recuperação fecha o MV.
+
+Exceções em que o MV **não** é fechado:
+
+- **`imprimir_salvar_envio = Não`** — o spec manda deixar o MOV DOC aberto para conferência;
+- **popup do MV aberto** — a mensagem precisa ser lida pelo operador.
+
+No meio do fluxo, `PR_FecharPendencias()` limpa telas auxiliares sem fechar o MV. Usar
+`PR_RecuperarTelas` fora do fim do fluxo quebraria a execução.
+
 ## Idempotência e recuperação
 
 - Fase 1 apaga os CSVs anteriores antes de gerar, então re-executar não lê planilha velha.
