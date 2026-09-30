@@ -94,6 +94,11 @@ RunFecharXML(params) {
     }
 
     Progress(100)
+
+    ; Saída obrigatória do fluxo: fecha a última tela do FFCV. A recuperação por remessa
+    ; acima devolve o FFCV ao menu entre iterações; aqui fecha-se o fluxo.
+    MV_FecharUltimaTela(MV_WIN_FFCV_ANY, "FFCV")
+
     FX_LogResumo(fechadas, xmlPulados, pendencias, totalStart)
 
     relatorio := "Fechamento e XML concluídos.`n`n"
@@ -275,7 +280,7 @@ FX_ConfirmarFechamento(remessa) {
             return FX_EstadoFechamentoFatal("Após a impressão, a tela de entrega da remessa " remessa " não estabilizou para sair.")
 
         if !FX_SairTelaEntrega()
-            return FX_EstadoFechamentoFatal("A tela de entrega da remessa " remessa " não fechou com o atalho " MV_ENTREGA_SAIR_ATALHO ". Nenhum WinClose é forçado porque o Oracle Forms perde estado.")
+            return FX_EstadoFechamentoFatal("A tela de entrega da remessa " remessa " não fechou com o atalho " MV_SAIR_TELA_ATALHO ". Nenhum WinClose é forçado porque o Oracle Forms perde estado.")
 
         if !MV_WaitOracleSettled(MV_WIN_FFCV_ANY, MV_FINAL_STABLE_MS, MV_FINAL_ACTION_TIMEOUT_MS)
             return FX_EstadoFechamentoFatal("O FFCV não estabilizou depois de sair da tela de entrega da remessa " remessa ".")
@@ -334,18 +339,12 @@ FX_ClassificarRecusa(remessa) {
 }
 
 FX_SairTelaEntrega() {
-    ; Ctrl+Q confirmado pelo operador para todas as telas do MV.
-    if (Trim(MV_ENTREGA_SAIR_ATALHO) = "") {
-        Notify("PENDENTE: atalho de saída da tela de entrega não mapeado (MV_ENTREGA_SAIR_ATALHO vazio).")
-        return false
-    }
-
     if !MV_EnsureWindowActive(MV_WIN_FFCV_DATAS) {
         Notify("Não consegui ativar a tela de entrega para enviar o atalho de saída.")
         return false
     }
 
-    Send MV_ENTREGA_SAIR_ATALHO
+    Send MV_SAIR_TELA_ATALHO
     return MV_Poll(() => !WinExist(MV_WIN_FFCV_DATAS), MV_TIMEOUT_ACOE)
 }
 
@@ -412,7 +411,7 @@ FX_GerarXml(remessa) {
     if !MV_WaitOracleSettled(MV_WIN_XML_PATH_FORM, MV_FINAL_STABLE_MS, MV_FINAL_ACTION_TIMEOUT_MS)
         Notify("Aviso: a tela de XML da remessa " remessa " não confirmou estabilidade após Voltar; saindo mesmo assim.")
 
-    Send MV_XML_BTN_SAIR_TELA
+    Send MV_SAIR_TELA_ATALHO
     Sleep MV_DELAY_INPUT
 
     if !FileExist(xmlPath)
@@ -596,8 +595,8 @@ FX_RecuperarTelas() {
         }
 
         if WinExist(MV_WIN_XML_TISS) {
-            Notify("Recuperação: saída da tela XML/TISS por " MV_XML_BTN_SAIR_TELA ".")
-            Send MV_XML_BTN_SAIR_TELA
+            Notify("Recuperação: saída da tela XML/TISS por " MV_SAIR_TELA_ATALHO ".")
+            Send MV_SAIR_TELA_ATALHO
             Sleep MV_DELAY_INPUT
         }
 
@@ -605,12 +604,12 @@ FX_RecuperarTelas() {
             ; Fase 4 do spec: reabrir a tela de entrega a cada iteração exige voltar ao menu.
             ; O MV reaproveita o mesmo HWND ao voltar ao menu, então "a janela sumiu" não é
             ; prova isolada: exigir também a estabilidade do FFCV.
-            if (Trim(MV_ENTREGA_SAIR_ATALHO) != "" && MV_EnsureWindowActive(MV_WIN_FFCV_DATAS)) {
-                Notify("Recuperação: saída da tela de entrega por " MV_ENTREGA_SAIR_ATALHO ".")
-                Send MV_ENTREGA_SAIR_ATALHO
+            if MV_EnsureWindowActive(MV_WIN_FFCV_DATAS) {
+                Notify("Recuperação: saída da tela de entrega por " MV_SAIR_TELA_ATALHO ".")
+                Send MV_SAIR_TELA_ATALHO
                 MV_Poll(() => !WinExist(MV_WIN_FFCV_DATAS), MV_TIMEOUT_ACOE)
             } else {
-                Notify("PENDENTE: sem atalho de saída válido, a tela de entrega da remessa pode ter ficado aberta.")
+                Notify("Recuperação: a tela de entrega da remessa pode ter ficado aberta.")
             }
         }
 
