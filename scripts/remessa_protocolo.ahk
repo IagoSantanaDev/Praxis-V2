@@ -47,12 +47,15 @@ MOVDOC_CHECK_RECEBIDO_X      := 718
 MOVDOC_CHECK_RECEBIDO_Y      := 359
 
 ; Coluna "Devolvido" da grid. Um checkbox POR LINHA, dentro da área rolável.
-; Spy em Praxis_TO-DO/Remessa_Protocolo/images/image1.png (1ª linha, Button5,
-; client 679/224) e image2.png (2ª linha, Button4, client 679/247): o MESMO
-; controle aparece com ClassNN diferente conforme a posição da linha, porque o
-; Oracle Forms renumera. Por isso NÃO existe constante de classe aqui — a busca
-; é por prefixo "Button" + geometria (RP_CheckGridDevolvido).
+; Origem: Window Spy do operador nas capturas do TO-DO (1ª linha, Button5,
+; client 679/224; 2ª linha, Button4, client 679/247) — o MESMO controle aparece
+; com ClassNN diferente conforme a posição da linha, porque o Oracle Forms
+; renumera. Por isso NÃO existe constante de classe aqui: a busca é por prefixo
+; "Button" + geometria (RP_CheckGridDevolvido).
 ; O Y vem de MOVDOC_GRID_ROWS_Y, que já está alinhado com a grade.
+; A captura não é versionada (1,7 MB em Praxis_TO-DO/, fora do Git por higiene),
+; então estas coordenadas não são auditáveis em um clone novo — validar com
+; Window Spy antes de mexer.
 ; docs/analise-causa-raiz/05-remessa-protocolo-coluna-devolvido.md
 MOVDOC_CHECK_DEVOLVIDO_X := 679
 MOVDOC_CHECK_DEVOLVIDO_CLASSE_PREFIXO := "Button"

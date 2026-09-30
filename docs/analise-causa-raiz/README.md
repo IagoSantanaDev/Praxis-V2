@@ -140,6 +140,17 @@ explícito "Fluxos como a baixa usam Ctrl+Q e depois Enter"). O Praxis envia
 
 ## Material de origem
 
-`Praxis_TO-DO/` e `Praxis_TO-DO.zip` são material de referência local e
-continuam fora do versionamento (regra 8 do `AGENTS.md`). Este diretório passa
-a ser o registro dos achados; o `Praxis_TO-DO/` é a fonte de evidência bruta.
+O que está versionado em `Praxis_TO-DO/` são **apenas os dois `.ahk` validados**
+(`Fechar&XML/Fechar&XML.ahk` e `Protocolar/protocolar.ahk`), porque são a fonte
+da verdade do alinhamento e os documentos citam arquivo:linha deles.
+
+O resto — 15 capturas de tela (1,7 MB), os `TO-DO.txt`, `Erro.txt`, `log.txt` e
+o `Praxis_TO-DO.zip` — **continua fora do versionamento** (regra 8 do
+`AGENTS.md`, e `.gitignore` agora bloqueia explicitamente). As capturas são
+evidência bruta de leitura nesta máquina: os documentos 01, 04 e 05 citam
+arquivos PNG específicos, e essas citações **não são reproduzíveis em um clone
+novo** — que é exatamente o problema descrito no
+[doc 06](06-sistematico-origem-das-constantes.md).
+
+Este diretório é o registro dos achados. O `Praxis_TO-DO/` versionado é a
+referência de fluxo; as capturas são o porquê dos valores.
