@@ -36,7 +36,7 @@ XML inválido) e, por decisão do operador, **estão fora de escopo por agora**
 
 | # | Etapa | Referência validada (`Fechar&XML.ahk`) | Praxis (`fechar_xml.ahk`) | Alinhamento |
 |---|---|---|---|---|
-| 1 | Ordem das fases | fecha **todas** as remessas, depois gera XML de **todas** (`:121-126`) | intercala: fecha a *n*, gera o XML dela, recupera telas, segue (`:68-94`, `:126-152`) | adotar a ordem da referência |
+| 1 | Ordem das fases | fecha **todas** as remessas, depois gera XML (`:121-126`) | ~~intercala: fecha a *n*, gera o XML dela~~ — **corrigido**, agora em dois laços | **feito** |
 | 2 | Navegação | menu → `Alt+L+E` direto (`:140`) | menu → `Alt+L+M{Enter}` (`:168`) → clique `Button6` (`:181`) | **conflito — ver 2.1** |
 | 3 | Preenchimento | clipboard: `^a` `^v`, `Tab`, `^v`, `Tab`, `^v` (`:154-159`, `:430-446`) | clique, `+{Tab}`, `Tab`, `SendText`, **`{Enter}`**, `SendText` (`:203-228`) | adotar teclado + clipboard, remover o `{Enter}` |
 | 4 | Modal de confirmação | clica **`Button1`** (OK) em "Sistema de Faturamento de Contas de Convênio"; erro se o texto contiver "Erro"/"Log de Erro" (`:260-279`) | clica **`Button2` (Não)** esperando Sim/Não (`:304-315`) | adotar a referência — **depois** do doc 03 |
@@ -124,28 +124,24 @@ janela de sucesso, e erro se o texto contiver "Erro" ou "Log de Erro"
 (`:260-279`). O alvo do alinhamento não está em dúvida — só o momento de
 aplicá-lo.
 
-### 2.4 A divergência 1 tem consequência estrutural
+### 2.4 A divergência 1 foi corrigida — e o detalhe que importava
 
-`scripts/fechar_xml.ahk:68-94`
+**Corrigido em dois laços** (`scripts/fechar_xml.ahk`): primeiro fecha todas as
+remessas, depois gera o XML das que efetivamente fecharam. `FX_ProcessarRemessa`
+foi dividida em `FX_FecharRemessa` (só o fechamento) e `FX_GerarXml` (só o XML).
 
-```ahk
-for idx, remessa in remessas {
-    resultado := FX_ProcessarRemessa(remessa, dataEntrega, dataVencimento)
-    FX_RecuperarTelas()          ; devolve o FFCV ao menu para a próxima
-    ...
-}
-```
+O detalhe que a divisão expôs vale mais que a reordenação em si: **um `fatal`
+no meio do laço de fechamento não pode abortar o módulo.** As remessas já
+fechadas estão fechadas no MV, e sem XML elas entram num estado de mão única —
+numa segunda tentativa o MV recusa fechar de novo, a remessa nunca mais entra
+na lista das fechadas, e o XML nunca é gerado. Por isso o `fatal` vira
+**pendência** e o laço apenas `break`, deixando a fase 2 rodar.
 
-`FX_ProcessarRemessa` (`:126-152`) faz as duas fases da **mesma** remessa antes
-de o laço avançar. A referência faz o oposto — `RunAutomation` (`:121-126`)
-chama `ProcessDelivery` para a lista inteira e só então `ProcessXml`.
-
-Alinhar aqui é a mudança de maior alcance do módulo: toca em
-`FX_ProcessarRemessa`, em `FX_RecuperarTelas`, no resumo e no tratamento de
-pendências. Vale notar que `FX_RecuperarTelas` **deixa de ser necessário entre
-iterações** quando as fases são separadas, porque o laço de fechamento já
-devolve o FFCV ao menu por conta própria. É o único item em que o alinhamento
-**remove** código.
+**Uma divergência do alinhamento, e ela é real:** a referência **não** filtra
+quais remessas recebem XML — `ProcessXml(remessas)` recebe o array inteiro e o
+percorre sem filtro (`:325`). O Praxis só gera XML das que fecharam, o que é
+melhor que a referência — e é exatamente a razão de o `fatal` não poder
+abortar.
 
 ## 3. Por que as divergências existem
 

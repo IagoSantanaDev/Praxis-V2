@@ -65,33 +65,68 @@ RunFecharXML(params) {
     fechadas    := 0
     xmlPulados  := 0
     pendencias  := []
+    aFechar     := []
 
+    ; ── FASE 1: fechar TODAS as remessas ────────────────────────
+    ; Alinhado ao fluxo validado (Fechar&XML.ahk:121-126), que fecha a lista
+    ; inteira e só depois gera o XML. A versão anterior intercalava — fechar a
+    ; remessa n, gerar o XML dela, recuperar telas — o que obrigava a
+    ; recuperação entre iterações só para tornar a intercala segura. Aqui a
+    ; recuperação continua por remessa (o fluxo validado também reabre a tela
+    ; de entrega entre uma e outra, em :168-182), mas o XML sai da sequência.
     for idx, remessa in remessas {
         stageStart := A_TickCount
         Notify("Remessa " remessa " (" idx "/" remessas.Length "): fechando...")
 
-        resultado := FX_ProcessarRemessa(remessa, dataEntrega, dataVencimento)
+        resultado := FX_FecharRemessa(remessa, dataEntrega, dataVencimento)
 
-        ; O finally do módulo sempre roda: devolve o FFCV ao menu para a próxima.
         FX_RecuperarTelas()
 
         if (resultado["estado"] = "fatal") {
-            FX_LogResumo(fechadas, xmlPulados, pendencias, totalStart)
-            return FX_Abort(resultado["erro"])
+            ; NÃO aborta aqui: as remessas já fechadas estão no aFechar e ainda
+            ; precisam de XML. Uma delas sem XML é estado que não se recupera —
+            ; o MV recusa fechar de novo, então a remessa nunca entraria no
+            ; aFechar numa segunda tentativa. O relatório sai como pendência e a
+            ; fase 2 roda normalmente.
+            Notify("Remessa " remessa ": falha fatal — " resultado["erro"] " Seguindo para gerar o XML das demais.")
+            pendencias.Push(Map("remessa", remessa, "motivo", resultado["erro"]))
+            break
         }
 
         if (resultado["estado"] = "fechada") {
             fechadas++
-            if (resultado["xml"] = "pulado")
-                xmlPulados++
-            else if (resultado["xml"] = "erro")
-                pendencias.Push(Map("remessa", remessa, "motivo", resultado["erro"]))
+            aFechar.Push(remessa)
         } else {
             pendencias.Push(Map("remessa", remessa, "motivo", resultado["erro"]))
         }
 
-        Notify("⏱ Remessa " remessa ": " MV_FormatDuration(A_TickCount - stageStart) " | " resultado["estado"] " (XML: " resultado["xml"] ")")
-        Progress(Round(100 * idx / remessas.Length))
+        Notify("⏱ Remessa " remessa ": " MV_FormatDuration(A_TickCount - stageStart) " | " resultado["estado"])
+        Progress(Round(50 * idx / remessas.Length))
+    }
+
+    if (aFechar.Length = 0)
+        Notify("Nenhuma remessa foi fechada com sucesso; nada a gerar de XML.")
+
+    ; ── FASE 2: gerar o XML das que foram efetivamente fechadas ──
+    ; Só entra aqui remessa que fechou. O fluxo validado também só gera XML
+    ; depois do fechamento (`:121-126`). Se nada fechou, aFechar está vazio e o
+    ; laço não roda — o relatório final mostra as pendências.
+    totalXml := aFechar.Length
+    for idx, remessa in aFechar {
+        stageStart := A_TickCount
+        Notify("Remessa " remessa " (" idx "/" totalXml "): gerando XML...")
+
+        xml := FX_GerarXml(remessa)
+
+        FX_RecuperarTelas()
+
+        if (xml["estado"] = "pulado")
+            xmlPulados++
+        else if (xml["estado"] = "erro")
+            pendencias.Push(Map("remessa", remessa, "motivo", xml["erro"]))
+
+        Notify("⏱ XML " remessa ": " MV_FormatDuration(A_TickCount - stageStart) " | " xml["estado"])
+        Progress(50 + Round(50 * idx / totalXml))
     }
 
     Progress(100)
@@ -107,6 +142,8 @@ RunFecharXML(params) {
     relatorio .= "Fechadas: " fechadas "`n"
     relatorio .= "XML pulado (arquivo já existia): " xmlPulados "`n"
     relatorio .= "Com pendência: " pendencias.Length "`n"
+    if (fechadas = 0)
+        relatorio .= "`nATENÇÃO: nenhuma remessa foi fechada. O XML de todas está pendente.`n"
     relatorio .= "Tempo total: " MV_FormatDuration(A_TickCount - totalStart) "`n"
     relatorio .= "`nDetecção de 'remessa já fechada' é PENDENTE: não existe referência OCR"
     relatorio .= " em lib\FFCV_ErrorReferences.json para esse texto. Hoje qualquer modal não"
@@ -124,9 +161,9 @@ RunFecharXML(params) {
     return true
 }
 
-FX_ProcessarRemessa(remessa, dataEntrega, dataVencimento) {
-    ; Fase 1 — abrir a tela de entrega direto do menu do FFCV (Alt+L+E), com a
-    ; impressão do relatório de atendimentos antes, quando o Button9 existe.
+FX_FecharRemessa(remessa, dataEntrega, dataVencimento) {
+    ; Só o fechamento. O XML é uma fase separada, alinhado ao fluxo validado
+    ; (Fechar&XML.ahk:121-126), que fecha toda a lista antes de gerar XML.
     if !FX_AbrirTelaEntrega()
         return FX_EstadoFatal("A tela de entrega da remessa " remessa " não abriu.")
 
@@ -141,15 +178,13 @@ FX_ProcessarRemessa(remessa, dataEntrega, dataVencimento) {
         ; O MV recusou (remessa já fechada, regra do hospital, etc.). Pendência da remessa:
         ; a lista segue para a próxima em vez de abortar.
         Notify("Remessa " remessa " recusada pelo MV: " fechamento["erro"])
-        return Map("estado", "pendencia", "xml", "", "erro", fechamento["erro"])
+        return Map("estado", "pendencia", "erro", fechamento["erro"])
     }
 
-    ; Fase 3 — gerar o XML.
-    xml := FX_GerarXml(remessa)
-    return Map("estado", "fechada", "xml", xml["estado"], "erro", xml["erro"])
+    return Map("estado", "fechada", "erro", "")
 }
 
-FX_EstadoFatal(erro) => Map("estado", "fatal", "xml", "", "erro", erro)
+FX_EstadoFatal(erro) => Map("estado", "fatal", "erro", erro)
 
 ; ════════════════════════════════════════════════════════════════
 ;  FASE 1 — ABRIR A TELA DE ENTREGA
@@ -362,6 +397,9 @@ FX_ConfirmarFechamento(remessa) {
     return Map("estado", "recusada", "erro", "MV recusou o fechamento (" recusa "). Modal descartado; a lista segue para a próxima remessa.")
 }
 
+; FX_EstadoFatal(erro) e este eram idênticos depois da separação das fases
+; (ambos produziam estado=fatal + erro). O do fechamento virou alias do
+; primeiro, e os 13 call sites que o usavam continuam válidos.
 FX_EstadoFechamentoFatal(erro) => Map("estado", "fatal", "erro", erro)
 
 FX_ResponderNaoModal() {
@@ -487,8 +525,16 @@ FX_GerarXml(remessa) {
     if !MV_WaitOracleSettled(MV_WIN_XML_PATH_FORM, MV_FINAL_STABLE_MS, MV_FINAL_ACTION_TIMEOUT_MS)
         Notify("Aviso: a tela de XML da remessa " remessa " não confirmou estabilidade após Voltar; saindo mesmo assim.")
 
+    ; Sai da tela TISS verificando que ela realmente fechou. Sem a verificação,
+    ; um Sleep fixo deixava a tela aberta e o FX_RecuperarTelas disparava um
+    ; SEGUNDO Ctrl+Q sem reativar a janela — e Ctrl+Q no menu principal fecha o
+    ; MV inteiro, o que derrubaria as remessas restantes do lote.
+    ; Mesma forma de FX_SairTelaEntrega: ativa, envia, espera a sumir.
+    if !MV_EnsureWindowActive(MV_WIN_XML_TISS)
+        Notify("Aviso: a tela XML/TISS não ficou ativa para sair; tentando o atalho mesmo assim.")
     Send MV_SAIR_TELA_ATALHO
-    Sleep MV_DELAY_INPUT
+    if !MV_Poll(() => !WinExist(MV_WIN_XML_TISS), MV_FINAL_ACTION_TIMEOUT_MS)
+        Notify("Aviso: a tela XML/TISS não confirmou saída após " MV_SAIR_TELA_ATALHO ".")
 
     if !FileExist(xmlPath)
         return Map("estado", "erro", "erro", "O MV não criou o arquivo " xmlPath ". Confira o relatório do TISS.")
@@ -683,9 +729,15 @@ FX_RecuperarTelas() {
         }
 
         if WinExist(MV_WIN_XML_TISS) {
-            Notify("Recuperação: saída da tela XML/TISS por " MV_SAIR_TELA_ATALHO ".")
-            Send MV_SAIR_TELA_ATALHO
-            Sleep MV_DELAY_INPUT
+            ; Ativa antes de enviar: sem isso o Ctrl+Q vai para a janela que
+            ; estiver em foco, e se for o menu principal fecha o MV inteiro.
+            if MV_EnsureWindowActive(MV_WIN_XML_TISS) {
+                Notify("Recuperação: saída da tela XML/TISS por " MV_SAIR_TELA_ATALHO ".")
+                Send MV_SAIR_TELA_ATALHO
+                MV_Poll(() => !WinExist(MV_WIN_XML_TISS), MV_FINAL_ACTION_TIMEOUT_MS)
+            } else {
+                Notify("Recuperação: a tela XML/TISS não ficou ativa; o atalho de saída não foi enviado.")
+            }
         }
 
         if WinExist(MV_WIN_FFCV_DATAS) {
