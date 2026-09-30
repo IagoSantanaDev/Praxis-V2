@@ -51,10 +51,10 @@ MV_WIN_XML_PATH_FORM := "MV2000i - Faturamento - [WIN_PRINCIPAL]"
 ; Atalho: Lançamentos → Monitoração de Faturamento - TISS.
 ; Confirmado contra o MV2000i pelo operador. Spy em Fluxos/Teste_corrigido.ahk L314.
 MV_TISS_ATALHO := "{Alt down}lmm{Enter}{Alt up}"
-; Saída da tela Entrega de Remessas. Confirmado pelo operador: Ctrl+Q.
-; Em AHK, "^q" é a notação de Ctrl+Q — o valor não precisa de coordenada nem de ajuste.
-; Esc foi descartado porque não sai desta tela.
-MV_ENTREGA_SAIR_ATALHO := "^q"
+; Saída de tela no MV2000i. Confirmado pelo operador: Ctrl+Q vale para TODAS as telas.
+; No menu principal fecha o MV. Em AHK, "^q" É a notação de Ctrl+Q — não ajustar.
+; {Esc} foi descartado: não sai da tela de Entrega de Remessas.
+MV_SAIR_TELA_ATALHO := "^q"
 
 ; ── Controles tela de datas ───────────────────────────────────
 ; Tela "Cadastro: Faturas e Remessas". Coordenadas Client vindas de Window Spy.
@@ -98,9 +98,6 @@ MV_XML_BTN_NAO           := "Button2"
 MV_XML_FORM_BTN_VOLTAR   := "Button7" ; Voltar
 MV_XML_FORM_BTN_VOLTAR_X := 731       ; Window Spy: client x do Button7
 MV_XML_FORM_BTN_VOLTAR_Y := 470       ; Window Spy: client y do Button7
-; Saída de tela no MV2000i. Confirmado pelo operador: Ctrl+Q vale para TODAS as telas do MV.
-; Em AHK, "^q" é a notação de Ctrl+Q — o valor não precisa de coordenada nem de ajuste.
-MV_XML_BTN_SAIR_TELA     := "^q"
 
 ; ── Polling / estabilidade ────────────────────────────────────
 MV_POLL_MS          := 100
@@ -506,6 +503,40 @@ MV_WaitWindowGone(winTitle, timeoutMs := 30000) {
             return false
         Sleep MV_POLL_MS
     }
+}
+
+; Fecha a tela corrente do MV com Ctrl+Q, ao fim de um fluxo.
+; NÃO fecha se houver popup do MV aberto: a mensagem daquele popup é a informação que o
+; operador precisa ler, e mandá-la embora destrói a única evidência do erro. Quem chama
+; deve avisar o operador, não tentar contornar.
+; NUNCA usar WinClose no Oracle Forms — perde o estado da aplicação.
+MV_FecharUltimaTela(winTitle, rotulo) {
+    if (MV_ActiveModalTitle() != "") {
+        MV_LogSaidaTela(rotulo, "há um popup do MV aberto. Não foi fechada automaticamente —"
+            " leia a mensagem na tela antes de rodar de novo.")
+        return false
+    }
+
+    if !WinExist(winTitle) {
+        MV_LogSaidaTela(rotulo, "a janela já não existe, nada a fechar.")
+        return true
+    }
+
+    if !MV_EnsureWindowActive(winTitle, MV_TIMEOUT_ACOE) {
+        MV_LogSaidaTela(rotulo, "a janela existe mas não ficou ativa para receber o atalho.")
+        return false
+    }
+
+    Send MV_SAIR_TELA_ATALHO
+    if !MV_WaitOracleSettled(winTitle, MV_FINAL_STABLE_MS, MV_FINAL_ACTION_TIMEOUT_MS)
+        MV_LogSaidaTela(rotulo, MV_SAIR_TELA_ATALHO " enviado, mas a janela não confirmou estabilidade.")
+
+    MV_LogSaidaTela(rotulo, MV_SAIR_TELA_ATALHO " enviado.")
+    return true
+}
+
+MV_LogSaidaTela(rotulo, detalhe) {
+    try SendToUI(Map("type", "log", "message", "Saída de " rotulo ": " detalhe))
 }
 
 MV_WaitOracleSettled(winTitle, stableMs := 800, timeoutMs := 30000) {
