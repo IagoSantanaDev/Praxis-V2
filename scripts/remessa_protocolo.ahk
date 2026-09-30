@@ -46,6 +46,20 @@ MOVDOC_CHECK_RECEBIDO_CLASS  := "Button1"
 MOVDOC_CHECK_RECEBIDO_X      := 718
 MOVDOC_CHECK_RECEBIDO_Y      := 359
 
+; Coluna "Devolvido" da grid. Um checkbox POR LINHA, dentro da área rolável.
+; Spy em Praxis_TO-DO/Remessa_Protocolo/images/image1.png (1ª linha, Button5,
+; client 679/224) e image2.png (2ª linha, Button4, client 679/247): o MESMO
+; controle aparece com ClassNN diferente conforme a posição da linha, porque o
+; Oracle Forms renumera. Por isso NÃO existe constante de classe aqui — a busca
+; é por prefixo "Button" + geometria (RP_CheckGridDevolvido).
+; O Y vem de MOVDOC_GRID_ROWS_Y, que já está alinhado com a grade.
+; docs/analise-causa-raiz/05-remessa-protocolo-coluna-devolvido.md
+MOVDOC_CHECK_DEVOLVIDO_X := 679
+MOVDOC_CHECK_DEVOLVIDO_CLASSE_PREFIXO := "Button"
+; Coluna "Recebido" fica a 718, a 39 px. A tolerância precisa ser menor que a
+; distância entre as colunas, senão a leitura pega o checkbox vizinho.
+MOVDOC_CHECK_DEVOLVIDO_TOL := 12
+
 ; ── Controles FFCV ────────────────────────────────────────────
 ; Manutenção de Remessa usa teclado/atalhos de propósito.
 ; Os campos de remessa são Oracle Forms com EditN variável conforme quantidade de
@@ -157,20 +171,36 @@ RunRemessaProtocolo(params) {
         Notify("Processando protocolo " protocolo " (" idx "/" protocolos.Length ")")
         result := ProcessarProtocolo(protocolo)
 
-        if !result["ok"]
+        if !result["ok"] {
+            ; Numa falha, as devolvidas do protocolo entram no relatório mesmo
+            ; assim: são a explicação mais provável de "não identificou convênio".
+            for _, d in result["devolvidas"]
+                erros.Push(d)
             return RP_Abort(result["erro"])
+        }
 
         for _, linha in result["linhas"]
             linhasMovDoc.Push(linha)
 
-        Notify("⏱ MOV DOC protocolo " protocolo ": " MV_FormatDuration(A_TickCount - protocolStart) " | " result["linhas"].Length " linha(s)")
+        for _, d in result["devolvidas"]
+            erros.Push(d)
+
+        Notify("⏱ MOV DOC protocolo " protocolo ": " MV_FormatDuration(A_TickCount - protocolStart) " | " result["linhas"].Length " linha(s)"
+            (result["devolvidas"].Length > 0 ? " | " result["devolvidas"].Length " devolvida(s) pulada(s)" : ""))
         Progress(5 + (idx / protocolos.Length) * 40)
     }
     RP_RecordTiming(timings, "MOV DOC consultar, coletar e baixar", stageStart, protocolos.Length " protocolo(s), " linhasMovDoc.Length " linha(s)")
 
     convenioNum := RP_ConvenioMajoritario(linhasMovDoc)
-    if (convenioNum = "")
-        return RP_Abort("Convênio não identificado no MOV DOC.")
+    if (convenioNum = "") {
+        devolvidas := 0
+        for _, e in erros
+            if InStr(e["descricao"], "devolvido")
+                devolvidas++
+        return RP_Abort(devolvidas > 0
+            ? ("Convênio não identificado: todas as " devolvidas " conta(s) do MOV DOC estão marcadas como devolvidas.")
+            : "Convênio não identificado no MOV DOC.")
+    }
 
     protocolContas := RP_FiltrarContasPorConvenio(linhasMovDoc, convenioNum, erros)
     totalContasFFCV := ContarContas(protocolContas)
@@ -283,21 +313,29 @@ RP_AbrirTelaBaixaMovDoc() {
 ProcessarProtocolo(protocolo) {
     WinActivate WIN_MOVDOC_BAIXA
     if !RP_SetProtocoloMovDocByClick(protocolo)
-        return Map("ok", false, "erro", "Não consegui focar/preencher o campo Protocolo.")
+        return Map("ok", false, "erro", "Não consegui focar/preencher o campo Protocolo.", "devolvidas", [])
 
     Sleep MV_DELAY_INPUT
     Send "{F8}"
     if !RP_WaitMovDocFirstGridLineReady(protocolo, &primeiraLinhaValida)
-        return Map("ok", false, "erro", "A primeira linha da grid não ficou legível após F8 para o protocolo " protocolo ".")
+        return Map("ok", false, "erro", "A primeira linha da grid não ficou legível após F8 para o protocolo " protocolo ".", "devolvidas", [])
 
-    linhas := RP_ColetarLinhasMovDoc(protocolo, primeiraLinhaValida)
-    if (linhas.Length = 0)
-        return Map("ok", false, "erro", "Nenhuma conta/convênio foi coletado para o protocolo " protocolo ".")
+    ; As devolvidas vão no resultado, e não em `erros`: erros é do módulo
+    ; RunRemessaProtocolo e não chega aqui. O chamador (:172) as mescla em
+    ; `erros` — mesmo array, mesmo formato de três chaves.
+    devolvidas := []
+    linhas := RP_ColetarLinhasMovDoc(protocolo, primeiraLinhaValida, devolvidas)
+    if (linhas.Length = 0) {
+        if (devolvidas.Length > 0)
+            return Map("ok", false, "erro", "Todas as contas do protocolo " protocolo
+                " estão marcadas como devolvidas no MOV DOC.", "devolvidas", devolvidas)
+        return Map("ok", false, "erro", "Nenhuma conta/convênio foi coletado para o protocolo " protocolo ".", "devolvidas", devolvidas)
+    }
 
     if !RP_FinalizarBaixaProtocolo()
-        return Map("ok", false, "erro", "Falha ao salvar/baixar o protocolo " protocolo ".")
+        return Map("ok", false, "erro", "Falha ao salvar/baixar o protocolo " protocolo ".", "devolvidas", devolvidas)
 
-    return Map("ok", true, "linhas", linhas)
+    return Map("ok", true, "linhas", linhas, "devolvidas", devolvidas)
 }
 
 RP_SetProtocoloMovDocByClick(protocolo) {
@@ -316,24 +354,33 @@ RP_SetProtocoloMovDocByClick(protocolo) {
     return true
 }
 
-RP_ColetarLinhasMovDoc(protocolo, primeiraLinha := "") {
+RP_ColetarLinhasMovDoc(protocolo, primeiraLinha := "", erros := []) {
     linhas := []
     vistos := Map()
 
     if (primeiraLinha is Map) {
         keyInicial := primeiraLinha["protocolo"] "|" primeiraLinha["conta"] "|" primeiraLinha["convenio"]
         vistos[keyInicial] := true
-        linhas.Push(primeiraLinha)
+        ; A semente é a PRIMEIRA LINHA da grade. Ela não passa por
+        ; RP_ColetarLinhasVisiveisMovDoc, então o Devolvido tem de ser checado
+        ; aqui — senão a conta devolvida da linha 1 vaza inteira para o FFCV.
+        if RP_LinhaDevolvida(MOVDOC_GRID_ROWS_Y[1]) {
+            erros.Push(Map("protocolo", protocolo, "conta", primeiraLinha["conta"],
+                "descricao", "pulada: documento marcado como devolvido no MOV DOC"))
+            Notify("Conta " primeiraLinha["conta"] " pulada: marcada como devolvida.")
+        } else {
+            linhas.Push(primeiraLinha)
+        }
     }
 
-    RP_ColetarLinhasVisiveisMovDoc(protocolo, linhas, vistos)
+    RP_ColetarLinhasVisiveisMovDoc(protocolo, linhas, vistos, erros)
 
     maxIteracoes := 100
     semNovasConsecutivas := 0
 
     Loop maxIteracoes {
         result := RP_AvancarGridMovDocQuatroLinhas()
-        added := RP_ColetarLinhasVisiveisMovDoc(protocolo, linhas, vistos)
+        added := RP_ColetarLinhasVisiveisMovDoc(protocolo, linhas, vistos, erros)
 
         ; Popup de último registro é o sinal mais confiável: parar imediatamente.
         if result["popup"]
@@ -380,7 +427,7 @@ RP_AvancarGridMovDocQuatroLinhas() {
     return Map("popup", false)
 }
 
-RP_ColetarLinhasVisiveisMovDoc(protocolo, linhas, vistos) {
+RP_ColetarLinhasVisiveisMovDoc(protocolo, linhas, vistos, erros := []) {
     added := 0
 
     for _, rowY in MOVDOC_GRID_ROWS_Y {
@@ -401,6 +448,17 @@ RP_ColetarLinhasVisiveisMovDoc(protocolo, linhas, vistos) {
             continue
 
         vistos[key] := true
+
+        ; Lê o Devolvido ANTES do Push: uma conta devolvida não pode entrar em
+        ; `linhas`, que é a origem de RP_ConvenioMajoritario, de
+        ; RP_FiltrarContasPorConvenio e de tudo que vai para o FFCV.
+        if RP_LinhaDevolvida(rowY) {
+            erros.Push(Map("protocolo", protocolo, "conta", conta,
+                "descricao", "pulada: documento marcado como devolvido no MOV DOC"))
+            Notify("Conta " conta " pulada: marcada como devolvida.")
+            continue
+        }
+
         linhas.Push(Map("protocolo", protocolo, "conta", conta, "convenio", convenio))
         added++
     }
@@ -898,6 +956,38 @@ RP_FindControlByClassPrefixAtPoint(winTitle, classPrefix, targetX, targetY, tole
     }
 
     return (bestHwnd && bestDist <= tolerance) ? bestHwnd : 0
+}
+
+; Estado do checkbox "Devolvido" de uma linha da grid do MOV DOC.
+; A geometria é de RP_FindControlByClassPrefixAtPoint porque o ClassNN do
+; checkbox varia com a posição da linha (Button4/Button5/...): o prefixo "Button"
+; casa em todos eles e a proximidade escolhe o da linha certa.
+; Retorna "" quando o controle não é encontrado — distinto de 0 (não marcado),
+; e o chamador precisa tratar os três estados.
+RP_CheckGridDevolvido(rowY) {
+    hwnd := RP_FindControlByClassPrefixAtPoint(
+        WIN_MOVDOC_BAIXA,
+        MOVDOC_CHECK_DEVOLVIDO_CLASSE_PREFIXO,
+        MOVDOC_CHECK_DEVOLVIDO_X,
+        rowY,
+        MOVDOC_CHECK_DEVOLVIDO_TOL)
+    if !hwnd
+        return ""
+    try return ControlGetChecked(hwnd)
+    catch
+        return ""
+}
+
+; Verdadeiro quando a conta da linha está marcada como devolvida e por isso não
+; pode seguir para a remessa. Um checkbox ilegível ("") NÃO conta como devolvida:
+; tratar como devolvida descartaria uma conta válida, e o operador perderia o
+; dinheiro. O caso ilegível vira aviso no log, para conferência posterior.
+RP_LinhaDevolvida(rowY) {
+    estado := RP_CheckGridDevolvido(rowY)
+    if (estado = "")
+        Notify("Aviso: não consegui ler o checkbox Devolvido da linha " rowY
+            ". Seguindo como NÃO devolvida — conferir a conta depois.")
+    return (estado = 1)
 }
 
 ConfigurarDropdownsPopup(tipoConta) {
