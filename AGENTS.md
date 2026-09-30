@@ -22,9 +22,12 @@ as regras abaixo seriam as únicas carregadas automaticamente.
   chama `RP_*` nem `PR_*`. Helper compartilhado novo sobe para `mv_session.ahk` com prefixo `MV_`.
 - **Automação do MV só está validada depois de rodar contra o MV2000i real.** Se você não rodou,
   diga isso explicitamente em vez de afirmar que funciona. `PENDENTE` significa `PENDENTE`.
-- **Não "conserte" constante pendente por adivinhação de coordenada de tela.** São pendentes
-  `MV_ENTREGA_SAIR_ATALHO` (`^q`, preenchido e nunca validado) e `MV_XML_BTN_SAIR_TELA` (vazio).
-  `{Down 121}` em `protocolar.ahk` é posicional e depende da ordenação do relatório na estação.
+- **Sair de tela no MV é Ctrl+Q.** Confirmado pelo operador para **todas** as telas. Em AHK, `^` é
+  Ctrl, então `^q` **é** Ctrl+Q — não é um valor suspeito nem falta mapear. Ambas as constantes
+  (`MV_ENTREGA_SAIR_ATALHO` e `MV_XML_BTN_SAIR_TELA`) valem `^q`. `{Esc}` foi descartado. Não
+  "conserte" nenhuma das duas.
+- **`{Down 121}` em `protocolar.ahk` é posicional** e depende da ordenação do relatório na estação
+  do hospital. Se mudar lá, o fluxo gera a planilha errada sem erro visível.
 
 ## Regras de automação (MV2000i / Oracle Forms 6i)
 

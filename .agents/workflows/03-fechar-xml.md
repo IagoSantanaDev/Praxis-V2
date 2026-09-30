@@ -72,7 +72,7 @@ confirmação, `{Enter}` na capa de impressão, e sair com `MV_ENTREGA_SAIR_ATAL
 
 Idêntica à Fase 4 do workflow 01: `MV_TISS_ATALHO` → campo remessa → `{F8}` →
 `MV_WaitOracleSettled` → `MV_XML_BTN_FATURAMENTO` → caminho `<gWorkDir>\XML\<remessa>.xml` →
-`MV_XML_FORM_BTN_SALVAR` → modais → `MV_XML_FORM_BTN_VOLTAR` → `{Esc}`.
+`MV_XML_FORM_BTN_SALVAR` → modais → `MV_XML_FORM_BTN_VOLTAR` → `MV_XML_BTN_SAIR_TELA`.
 
 **Antes de gerar**, checar se o arquivo já existe. Se existir, **pular esta remessa** e logar
 `XML já existe, não sobrescrito`. É a mesma política do modal de substituição, que já responde
@@ -104,8 +104,7 @@ menu, então **não** use "a janela sumiu" como prova isolada de que a entrega t
 
 | Item | Situação |
 |------|----------|
-| `MV_ENTREGA_SAIR_ATALHO` | `^q` preenchido, mas **não validado** contra o MV. `Esc` foi descartado por não sair. |
-| `MV_XML_BTN_SAIR_TELA` | vazio. A saída usa `{Esc}`. Atalho correto nunca descoberto. |
+| `MV_XML_BTN_SAIR_TELA` | `^q` (Ctrl+Q), confirmado pelo operador. Antes usava `{Esc}`. |
 | Saída da Manutenção de Remessa | **não mapeada em lugar nenhum do projeto.** Ao voltar ao menu o Forms pode reabrir a tela; se o `finally` não conseguir sair, o operador precisa fechar a tela à mão antes da próxima execução. Não há constante para ela. |
 | Referência OCR de "remessa já fechada" | não existe em `lib/FFCV_ErrorReferences.json`. Ver "Não validado" abaixo. |
 
@@ -117,7 +116,7 @@ autônomo com GUI e `ToolTip` próprios. No Praxis não existe `ToolTip`: o prog
 `Notify`/`Progress`/`Done`. A sequência das fases foi validada no script original, mas **não**
 dentro do app.
 
-Não validados: `MV_ENTREGA_SAIR_ATALHO`, a sequência de teclado para preencher as datas, todas as
+Não validados: a sequência de teclado para preencher as datas, todas as
 coordenadas `MV_DATAS_*` e `MV_XML_*`, e o `MV_TISS_ATALHO` (cujo valor veio do operador).
 
 Um desvio consciente do spec: **"remessa já fechada" não é detectável**. O
