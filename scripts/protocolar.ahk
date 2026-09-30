@@ -1337,7 +1337,12 @@ PR_ControleExiste(hwnd, classNN) {
 PR_JanelaVisivel(hwnd) {
     if !hwnd
         return false
-    try return WinGetStyle("ahk_id " hwnd) & 0x1000000   ; WS_VISIBLE
+    ; 0x10000000 é WS_VISIBLE. 0x1000000 (WS_MAXIMIZE) reprova toda janela
+    ; normal — inclusive o diálogo "Salvar como" — e desligava a detecção de
+    ; popup de erro por conta. Confirmado por execução: style 0x94CA0000 de uma
+    ; janela de diálogo comum tem o bit WS_VISIBLE ativo e o WS_MAXIMIZE inativo.
+    ; docs/analise-causa-raiz/01-protocolar-salvar-como-nao-detectado.md
+    try return WinGetStyle("ahk_id " hwnd) & 0x10000000   ; WS_VISIBLE
     catch
         return false
 }
