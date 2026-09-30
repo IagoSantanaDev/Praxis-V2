@@ -13,41 +13,639 @@
 ;   data_entrega    -> data de entrega
 ;   data_vencimento -> data de vencimento
 ;
-; A automação operacional no MV ainda depende dos títulos e ClassNN reais
-; capturados pelo Window Spy.
+; Spec: .agents\workflows\03-fechar-xml.md
+;
+; ── Escopo (armadilhas desta casa) ───────────────────────────────
+; NÃO declarar #Include aqui. `mv_session.ahk` e `lib\FFCV_ErrorTemplates.ahk`
+; chegam a este arquivo por include TRANSITIVO (main.ahk → remessa_protocolo.ahk).
+; Um #Include novo duplicaria todas as funções MV_* e quebraria o build.
+;
+; NÃO chamar funções RP_*. Os fluxos são autônomos: helper equivalente que só
+; existe no remessa_protocolo.ahk é replicado aqui com prefixo FX_.
+;
+; Saída somente por Notify / Progress / Done e pelo abort FX_Abort.
+; Nada de Gui, MsgBox, ToolTip ou hotkey.
+
+; ── Constantes locais ───────────────────────────────────────────
+; FFCV_BTN_ABRIR_DATAS vive no remessa_protocolo.ahk (prefixo RP_). Replicado aqui
+; com o MESMO ClassNN e o MESMO ponto Client para manter os fluxos independentes.
+; PENDENTE: não revalidado neste fluxo — só o workflow 01 rodou contra o MV2000i.
+FX_BTN_ABRIR_DATAS   := "Button6"  ; 5 - Entregar Rem.
+FX_BTN_ABRIR_DATAS_X := 464
+FX_BTN_ABRIR_DATAS_Y := 458
+
+; Espera máxima do modal de confirmação/recusa logo após confirmar a entrega.
+FX_MODAL_CONFIRMACAO_TIMEOUT_SEG := 10
+
+; ════════════════════════════════════════════════════════════════
+;  ENTRADA DO MÓDULO
+; ════════════════════════════════════════════════════════════════
 
 RunFecharXML(params) {
     global gRunning
 
-    remessas := FecharXML_ParseRemessas(params["remessas"])
-    dataEntrega := Trim(params["data_entrega"])
+    remessas       := FX_ParseRemessas(params["remessas"])
+    dataEntrega    := Trim(params["data_entrega"])
     dataVencimento := Trim(params["data_vencimento"])
 
     if (remessas.Length = 0)
-        return FecharXML_Abort("Informe o número das remessas. Ex: 511458, 514015")
+        return FX_Abort("Informe o número das remessas. Ex: 511458, 514015")
     if (dataEntrega = "")
-        return FecharXML_Abort("Informe a data de entrega.")
+        return FX_Abort("Informe a data de entrega.")
     if (dataVencimento = "")
-        return FecharXML_Abort("Informe a data de vencimento.")
+        return FX_Abort("Informe a data de vencimento.")
 
-    SendToUI(Map("type", "log", "message", "Fechar e Gerar XML: " . remessas.Length . " remessa(s), entrega " . dataEntrega . ", vencimento " . dataVencimento . "."))
-    return FecharXML_Abort("Parâmetros recebidos. Falta implementar a automação do MV para fechar e gerar XML com os controles do Window Spy.")
+    Notify("Fechar e Gerar XML: " remessas.Length " remessa(s), entrega " dataEntrega ", vencimento " dataVencimento ".")
+
+    if !MV_EnsureFFCV()
+        return FX_Abort("Não foi possível acessar o FFCV. Abra e autentique o FFCV no MV2000i e tente de novo.")
+
+    totalStart  := A_TickCount
+    fechadas    := 0
+    xmlPulados  := 0
+    pendencias  := []
+
+    for idx, remessa in remessas {
+        stageStart := A_TickCount
+        Notify("Remessa " remessa " (" idx "/" remessas.Length "): fechando...")
+
+        resultado := FX_ProcessarRemessa(remessa, dataEntrega, dataVencimento)
+
+        ; O finally do módulo sempre roda: devolve o FFCV ao menu para a próxima.
+        FX_RecuperarTelas()
+
+        if (resultado["estado"] = "fatal") {
+            FX_LogResumo(fechadas, xmlPulados, pendencias, totalStart)
+            return FX_Abort(resultado["erro"])
+        }
+
+        if (resultado["estado"] = "fechada") {
+            fechadas++
+            if (resultado["xml"] = "pulado")
+                xmlPulados++
+            else if (resultado["xml"] = "erro")
+                pendencias.Push(Map("remessa", remessa, "motivo", resultado["erro"]))
+        } else {
+            pendencias.Push(Map("remessa", remessa, "motivo", resultado["erro"]))
+        }
+
+        Notify("⏱ Remessa " remessa ": " MV_FormatDuration(A_TickCount - stageStart) " | " resultado["estado"] " (XML: " resultado["xml"] ")")
+        Progress(Round(100 * idx / remessas.Length))
+    }
+
+    Progress(100)
+    FX_LogResumo(fechadas, xmlPulados, pendencias, totalStart)
+
+    relatorio := "Fechamento e XML concluídos.`n`n"
+    relatorio .= "Remessas informadas: " remessas.Length "`n"
+    relatorio .= "Fechadas: " fechadas "`n"
+    relatorio .= "XML pulado (arquivo já existia): " xmlPulados "`n"
+    relatorio .= "Com pendência: " pendencias.Length "`n"
+    relatorio .= "Tempo total: " MV_FormatDuration(A_TickCount - totalStart) "`n"
+    relatorio .= "`nDetecção de 'remessa já fechada' é PENDENTE: não existe referência OCR"
+    relatorio .= " em lib\FFCV_ErrorReferences.json para esse texto. Hoje qualquer modal não"
+    relatorio .= " reconhecido na confirmação do fechamento vira pendência e a lista continua —"
+    relatorio .= " comportamento mais permissivo que o ideal."
+
+    if (pendencias.Length > 0) {
+        relatorio .= "`n`nPENDÊNCIAS`n"
+        for _, item in pendencias
+            relatorio .= "  [[red]]" item["remessa"] " | " item["motivo"] "[[/red]]`n"
+    }
+
+    gRunning := false
+    Done(relatorio)
+    return true
 }
 
-FecharXML_ParseRemessas(str) {
-    result := []
+FX_ProcessarRemessa(remessa, dataEntrega, dataVencimento) {
+    ; Fase 1 — abrir a tela de entrega a partir de uma instância nova da Manutenção de Remessa.
+    if !FX_AbrirManutencaoRemessa()
+        return FX_EstadoFatal("Não consegui abrir a Manutenção de Remessa no FFCV para a remessa " remessa ".")
+
+    ; Fase 2 — fechar a remessa.
+    if !FX_AbrirTelaEntrega()
+        return FX_EstadoFatal("A tela de entrega da remessa " remessa " não abriu.")
+
+    preenchimento := FX_PreencherDatasPorTeclado(remessa, dataEntrega, dataVencimento)
+    if !preenchimento["ok"]
+        return FX_EstadoFatal(preenchimento["erro"])
+
+    fechamento := FX_ConfirmarFechamento(remessa)
+    if (fechamento["estado"] = "fatal")
+        return FX_EstadoFatal(fechamento["erro"])
+    if (fechamento["estado"] = "recusada") {
+        ; O MV recusou (remessa já fechada, regra do hospital, etc.). Pendência da remessa:
+        ; a lista segue para a próxima em vez de abortar.
+        Notify("Remessa " remessa " recusada pelo MV: " fechamento["erro"])
+        return Map("estado", "pendencia", "xml", "", "erro", fechamento["erro"])
+    }
+
+    ; Fase 3 — gerar o XML.
+    xml := FX_GerarXml(remessa)
+    return Map("estado", "fechada", "xml", xml["estado"], "erro", xml["erro"])
+}
+
+FX_EstadoFatal(erro) => Map("estado", "fatal", "xml", "", "erro", erro)
+
+; ════════════════════════════════════════════════════════════════
+;  FASE 1 — ABRIR A TELA DE ENTREGA
+; ════════════════════════════════════════════════════════════════
+
+FX_AbrirManutencaoRemessa() {
+    ; Sempre instância nova. O original imprimia "Relatório Atend." (Button9) antes de
+    ; abrir a entrega; o spec 03 decidiu não incluir — o botão não existe em todas as telas.
+    MV_ActivateModule(MV_WIN_FFCV_ANY)
+    if !MV_WaitWindowStable(MV_WIN_FFCV_ANY, MV_MODULE_STABLE_MS, MV_TIMEOUT_LOAD)
+        return false
+
+    ; Atalho validado no macro 03: Lançamentos → Manutenção de Remessa.
+    Send "{Alt down}lm{Alt up}{Enter}"
+
+    if !MV_Poll(() => WinExist(MV_WIN_FFCV_REMESSA), MV_TIMEOUT_LOAD)
+        return false
+
+    return MV_WaitWindowStable(MV_WIN_FFCV_REMESSA, MV_TARGET_STABLE_MS, MV_TIMEOUT_LOAD)
+}
+
+FX_AbrirTelaEntrega() {
+    if !MV_EnsureWindowActive(MV_WIN_FFCV_ANY)
+        return false
+
+    startedAt := A_TickCount
+    if !MV_ClickBySpec(MV_WIN_FFCV_ANY, FX_BTN_ABRIR_DATAS, FX_BTN_ABRIR_DATAS_X, FX_BTN_ABRIR_DATAS_Y)
+        return false
+
+    if !MV_Poll(() => WinExist(MV_WIN_FFCV_DATAS), MV_TIMEOUT_LOAD)
+        return false
+
+    Notify("Tela de entrega de datas detectada em " (A_TickCount - startedAt) "ms.")
+    return true
+}
+
+; ════════════════════════════════════════════════════════════════
+;  FASE 2 — PREENCHER DATAS E FECHAR
+; ════════════════════════════════════════════════════════════════
+
+FX_PreencherDatasPorTeclado(remessaParam, dataEntrega, dataVencimento) {
+    if !MV_EnsureWindowActive(MV_WIN_FFCV_DATAS)
+        return Map("ok", false, "erro", "A tela de entrega de datas não ficou ativa para preencher as datas.", "remessaTela", "")
+
+    ; Contrato validado no teste 12: ancorar o foco em Data de Entrega, Shift+Tab chega ao
+    ; número da remessa, Tab volta para Data de Entrega e Enter avança para Data Prevista.
+    ; NÃO usar Ctrl+A: o Forms trata o atalho de forma imprevisível nos campos de data.
+    CoordMode("Mouse", "Client")
+    Click(MV_DATAS_CAMPO_ENTREGA_X + 15, MV_DATAS_CAMPO_ENTREGA_Y + 8, 1)
+    Sleep MV_KEY_SETTLE_MS
+
+    Send("+{Tab}")
+    Sleep MV_KEY_SETTLE_MS
+    remessaTela := FX_CopyFocusedNumericText(600)
+
+    ; A remessa vem do PARÂMETRO. O valor da tela serve só para conferência/log:
+    ; se divergir, o operador precisa saber antes de conferir o FFCV manualmente.
+    if (remessaTela != "") {
+        if (remessaTela = remessaParam)
+            Notify("Conferência: a tela de datas mostra a remessa " remessaTela ".")
+        else
+            Notify("Atenção: parâmetro " remessaParam " x tela de datas " remessaTela ". Seguindo com o parâmetro.")
+    } else {
+        Notify("Atenção: não consegui ler o número da remessa na tela de datas. Seguindo com o parâmetro " remessaParam ".")
+    }
+
+    Send("{Tab}")
+    Sleep MV_KEY_SETTLE_MS
+    SendText dataEntrega
+    Sleep MV_KEY_SETTLE_MS
+    Send("{Enter}")
+    Sleep MV_KEY_SETTLE_MS
+    SendText dataVencimento
+    Sleep MV_KEY_SETTLE_MS
+
+    Notify("Datas enviadas por teclado: entrega " dataEntrega ", vencimento " dataVencimento ".")
+    return Map("ok", true, "erro", "", "remessaTela", remessaTela)
+}
+
+FX_CopyFocusedNumericText(timeoutMs := 600) {
+    A_Clipboard := ""
+    Send("^c")
+    if !ClipWait(timeoutMs / 1000)
+        return ""
+
+    value := Trim(A_Clipboard)
+    if RegExMatch(value, "\d+", &m)
+        return m[0]
+    return ""
+}
+
+FX_ConfirmarFechamento(remessa) {
+    ; Checkbox "Fechar contas sem imprimir faturas": estado vem do controle Button3.
+    checked := MV_ControlCheckedAt(MV_WIN_FFCV_DATAS, MV_DATAS_CHECKBOX, MV_DATAS_CHECKBOX_X, MV_DATAS_CHECKBOX_Y, 20)
+    if (checked = 0) {
+        if !MV_ClickBySpec(MV_WIN_FFCV_DATAS, MV_DATAS_CHECKBOX, MV_DATAS_CHECKBOX_X, MV_DATAS_CHECKBOX_Y)
+            return FX_EstadoFechamentoFatal("Não consegui marcar 'Fechar contas sem imprimir faturas' na remessa " remessa ".")
+    } else if (checked = "") {
+        return FX_EstadoFechamentoFatal("Não consegui ler o estado de 'Fechar contas sem imprimir faturas' na remessa " remessa ".")
+    }
+    Sleep MV_DELAY_INPUT
+
+    if !MV_ClickBySpec(MV_WIN_FFCV_DATAS, MV_DATAS_BTN_CONFIRMAR, MV_DATAS_BTN_CONFIRMAR_X, MV_DATAS_BTN_CONFIRMAR_Y)
+        return FX_EstadoFechamentoFatal("Não consegui confirmar a entrega da remessa " remessa ".")
+
+    if !FX_EsperarQualquerModal(FX_MODAL_CONFIRMACAO_TIMEOUT_SEG)
+        return FX_EstadoFechamentoFatal("Nenhum modal apareceu após confirmar a entrega da remessa " remessa ".")
+
+    if FX_ResponderNaoModal() {
+        ; Caminho validado: modal de confirmação → Não (não imprimir as faturas).
+        if !FX_EsperarModalFechar(MV_FINAL_ACTION_TIMEOUT_MS)
+            return FX_EstadoFechamentoFatal("Respondi Não no modal de confirmação da remessa " remessa ", mas o modal não fechou em tempo.")
+
+        if !MV_Poll(() => WinExist(MV_WIN_CAPA_REMESSA), MV_TIMEOUT_LOAD)
+            return FX_EstadoFechamentoFatal("A tela de impressão da remessa " remessa " não apareceu.")
+        if !MV_EnsureWindowActive(MV_WIN_CAPA_REMESSA)
+            return FX_EstadoFechamentoFatal("A tela de impressão da remessa " remessa " apareceu, mas não ficou ativa para confirmar.")
+        if !MV_WaitOracleSettled(MV_WIN_CAPA_REMESSA, MV_FINAL_STABLE_MS, MV_FINAL_ACTION_TIMEOUT_MS)
+            return FX_EstadoFechamentoFatal("A tela de impressão da remessa " remessa " não estabilizou antes do Enter.")
+
+        Send "{Enter}"
+        if !MV_WaitWindowGone(MV_WIN_CAPA_REMESSA, MV_FINAL_ACTION_TIMEOUT_MS)
+            return FX_EstadoFechamentoFatal("Enviei Enter na tela de impressão da remessa " remessa ", mas ela não fechou em tempo.")
+
+        if !MV_WaitOracleSettled(MV_WIN_FFCV_DATAS, MV_FINAL_STABLE_MS, MV_FINAL_ACTION_TIMEOUT_MS)
+            return FX_EstadoFechamentoFatal("Após a impressão, a tela de entrega da remessa " remessa " não estabilizou para sair.")
+
+        if !FX_SairTelaEntrega()
+            return FX_EstadoFechamentoFatal("A tela de entrega da remessa " remessa " não fechou com o atalho " MV_ENTREGA_SAIR_ATALHO ". Nenhum WinClose é forçado porque o Oracle Forms perde estado.")
+
+        if !MV_WaitOracleSettled(MV_WIN_FFCV_ANY, MV_FINAL_STABLE_MS, MV_FINAL_ACTION_TIMEOUT_MS)
+            return FX_EstadoFechamentoFatal("O FFCV não estabilizou depois de sair da tela de entrega da remessa " remessa ".")
+
+        return Map("estado", "fechada", "erro", "")
+    }
+
+    ; Não é o modal de confirmação: o MV recusou o fechamento.
+    ; PENDENTE: lib\FFCV_ErrorReferences.json não tem referência para "remessa já fechada",
+    ; então FFCV_ClassifyErrorModal devolve "erro_desconhecido" para esse texto. O caso é
+    ; tratado como pendência da remessa atual e a lista continua.
+    recusa := FX_ClassificarRecusa(remessa)
+    if !FX_DescartarModalSeguro()
+        return FX_EstadoFechamentoFatal("O MV recusou fechar a remessa " remessa " (" recusa "), e não consegui fechar o modal com segurança.")
+
+    return Map("estado", "recusada", "erro", "MV recusou o fechamento (" recusa "). Modal descartado; a lista segue para a próxima remessa.")
+}
+
+FX_EstadoFechamentoFatal(erro) => Map("estado", "fatal", "erro", erro)
+
+FX_ResponderNaoModal() {
+    ; Confirmação do FFCV: "Mensagem ao Usuário do MV 2000" com Botão1=Sim / Botão2=Não.
+    ; MV_XML_BTN_NAO é o "Button2" compartilhado do contrato de janela (nome legado).
+    if WinExist(MV_WIN_MSG_USER)
+        return MV_ClickFirstControl(MV_WIN_MSG_USER, MV_XML_BTN_NAO)
+
+    popup := MV_ActiveModalTitle()
+    if (popup != "")
+        return MV_ClickFirstControl(popup, MV_XML_BTN_NAO)
+
+    return false
+}
+
+FX_ClassificarRecusa(remessa) {
+    popup := FX_ModalAtivo()
+    if (popup = "")
+        return "modal sem título reconhecível"
+
+    classificacao := FFCV_ClassifyErrorModal(popup)
+    tipo  := classificacao.Get("tipo", "erro_desconhecido")
+    texto := Trim(classificacao.Get("texto", ""))
+    fonte := classificacao.Get("fonte", "")
+
+    ; Registro o texto bruto do OCR: sem ele não há como criar a referência que falta
+    ; em lib\FFCV_ErrorReferences.json quando o MV for capturado com o modal aberto.
+    detalhes := "tipo OCR=" tipo
+    if (fonte != "")
+        detalhes .= " | " fonte
+    if (texto != "")
+        detalhes .= " | OCR: " (StrLen(texto) > 240 ? SubStr(texto, 1, 240) "…" : texto)
+    else
+        detalhes .= " | OCR não leu texto"
+
+    Notify("Remessa " remessa ": modal do FFCV -> " detalhes)
+    return detalhes
+}
+
+FX_SairTelaEntrega() {
+    ; O atalho ^q está preenchido mas NÃO validado contra o MV2000i. Esc foi descartado
+    ; porque não sai da tela. Sem o atalho, a recuperação só registra e segue.
+    if (Trim(MV_ENTREGA_SAIR_ATALHO) = "") {
+        Notify("PENDENTE: atalho de saída da tela de entrega não mapeado (MV_ENTREGA_SAIR_ATALHO vazio).")
+        return false
+    }
+
+    if !MV_EnsureWindowActive(MV_WIN_FFCV_DATAS) {
+        Notify("Não consegui ativar a tela de entrega para enviar o atalho de saída.")
+        return false
+    }
+
+    Send MV_ENTREGA_SAIR_ATALHO
+    return MV_Poll(() => !WinExist(MV_WIN_FFCV_DATAS), MV_TIMEOUT_ACOE)
+}
+
+; ════════════════════════════════════════════════════════════════
+;  FASE 3 — GERAR O XML
+; ════════════════════════════════════════════════════════════════
+
+FX_GerarXml(remessa) {
+    global gWorkDir
+
+    if (Trim(gWorkDir) = "")
+        return Map("estado", "erro", "erro", "WorkDir não configurado. Verifique o config.ini (Paths/WorkDir).")
+
+    xmlDir  := Trim(gWorkDir) "\XML"
+    xmlPath := xmlDir "\" remessa ".xml"
+
+    ; Idempotência: nunca sobrescrever. Checar antes evita o processamento pesado do relatório.
+    if FileExist(xmlPath) {
+        Notify("XML já existe, não sobrescrito: " xmlPath)
+        return Map("estado", "pulado", "erro", "")
+    }
+
+    if !FX_AbrirTelaTiss()
+        return Map("estado", "erro", "erro", "A tela de XML/TISS não abriu para a remessa " remessa ".")
+
+    if !MV_SetTextByClickNoClear(MV_WIN_XML_TISS, MV_XML_CAMPO_REMESSA_X, MV_XML_CAMPO_REMESSA_Y, remessa)
+        return Map("estado", "erro", "erro", "Não consegui preencher a remessa " remessa " na tela XML/TISS.")
+    Sleep MV_KEY_SETTLE_MS
+    Send "{F8}"
+
+    consulta := FX_EsperarConsultaXmlPronta(MV_FINAL_ACTION_TIMEOUT_MS)
+    if !consulta["ok"]
+        return Map("estado", "erro", "erro", consulta["erro"])
+    Notify("Consulta XML/TISS da remessa " remessa " estabilizada em " consulta["elapsed"] "ms.")
+
+    if !MV_ClickBySpec(MV_WIN_XML_TISS, MV_XML_BTN_FATURAMENTO, MV_XML_BTN_FATURAMENTO_X, MV_XML_BTN_FATURAMENTO_Y)
+        return Map("estado", "erro", "erro", "Não consegui acionar o botão Faturamento na tela XML/TISS da remessa " remessa ".")
+
+    formulario := FX_EsperarFormularioXmlOuModal(MV_TIMEOUT_LOAD)
+    if !formulario["ok"]
+        return Map("estado", "erro", "erro", formulario["erro"])
+
+    if !DirExist(xmlDir)
+        DirCreate xmlDir
+
+    if !MV_SetTextByClickAt(MV_WIN_XML_PATH_FORM, MV_XML_FORM_CAMPO_PATH_X, MV_XML_FORM_CAMPO_PATH_Y, xmlPath)
+        return Map("estado", "erro", "erro", "Não consegui preencher o caminho do XML da remessa " remessa ".")
+    if !MV_WaitOracleSettled(MV_WIN_XML_PATH_FORM, MV_FINAL_STABLE_MS, MV_FINAL_ACTION_TIMEOUT_MS)
+        return Map("estado", "erro", "erro", "A tela de caminho do XML da remessa " remessa " não estabilizou antes de salvar.")
+
+    if !MV_ClickBySpec(MV_WIN_XML_PATH_FORM, MV_XML_FORM_BTN_SALVAR, MV_XML_FORM_BTN_SALVAR_X, MV_XML_FORM_BTN_SALVAR_Y)
+        return Map("estado", "erro", "erro", "Não consegui acionar o botão Salvar_XML da remessa " remessa ".")
+
+    modais := FX_TratarModaisXmlSalvo()
+    if !modais["ok"]
+        return Map("estado", "erro", "erro", modais["erro"])
+
+    if !MV_WaitOracleSettled(MV_WIN_XML_PATH_FORM, MV_FINAL_STABLE_MS, MV_FINAL_ACTION_TIMEOUT_MS)
+        return Map("estado", "erro", "erro", "Após salvar o XML da remessa " remessa ", a tela não estabilizou para voltar.")
+
+    if !MV_ClickBySpec(MV_WIN_XML_PATH_FORM, MV_XML_FORM_BTN_VOLTAR, MV_XML_FORM_BTN_VOLTAR_X, MV_XML_FORM_BTN_VOLTAR_Y)
+        return Map("estado", "erro", "erro", "Não consegui voltar da tela de XML da remessa " remessa ".")
+
+    if !MV_WaitOracleSettled(MV_WIN_XML_PATH_FORM, MV_FINAL_STABLE_MS, MV_FINAL_ACTION_TIMEOUT_MS)
+        Notify("Aviso: a tela de XML da remessa " remessa " não confirmou estabilidade após Voltar; saindo mesmo assim.")
+
+    ; PENDENTE: MV_XML_BTN_SAIR_TELA continua vazio — o atalho correto nunca foi descoberto.
+    ; A saída usa {Esc}, como no workflow 01.
+    Send "{Esc}"
+    Sleep MV_DELAY_INPUT
+
+    if !FileExist(xmlPath)
+        return Map("estado", "erro", "erro", "O MV não criou o arquivo " xmlPath ". Confira o relatório do TISS.")
+
+    Notify("XML gerado: " xmlPath)
+    return Map("estado", "gerado", "erro", "")
+}
+
+FX_AbrirTelaTiss() {
+    if !MV_EnsureWindowActive(MV_WIN_FFCV_ANY)
+        return false
+
+    startedAt := A_TickCount
+    ; Atalho confirmado pelo operador. Constante canônica em mv_session.ahk.
+    Send MV_TISS_ATALHO
+
+    ok := MV_Poll(() => WinExist(MV_WIN_XML_TISS), MV_TIMEOUT_LOAD)
+    if ok
+        Notify("Tela XML/TISS detectada em " (A_TickCount - startedAt) "ms.")
+    return ok
+}
+
+FX_EsperarConsultaXmlPronta(timeoutMs := 30000) {
+    startedAt := A_TickCount
+    stableSince := 0
+
+    Loop {
+        if (FX_ModalAtivo() != "")
+            return Map("ok", false, "elapsed", A_TickCount - startedAt, "erro", "Modal apareceu depois de consultar a remessa no XML/TISS: " FX_TextoModalSeguro())
+
+        minWaitOk := (A_TickCount - startedAt >= MV_XML_QUERY_MIN_WAIT_MS)
+        if (minWaitOk
+            && MV_ControlAtReady(MV_WIN_XML_TISS, MV_XML_BTN_FATURAMENTO, MV_XML_BTN_FATURAMENTO_X, MV_XML_BTN_FATURAMENTO_Y, 20)
+            && A_Cursor != "Wait" && A_Cursor != "AppStarting") {
+            if (stableSince = 0)
+                stableSince := A_TickCount
+            if (A_TickCount - stableSince >= MV_FINAL_STABLE_MS)
+                return Map("ok", true, "elapsed", A_TickCount - startedAt, "erro", "")
+        } else {
+            stableSince := 0
+        }
+
+        if (A_TickCount - startedAt >= timeoutMs)
+            return Map("ok", false, "elapsed", A_TickCount - startedAt, "erro", "A consulta da remessa no XML/TISS não estabilizou em " timeoutMs "ms.")
+
+        Sleep MV_POLL_MS
+    }
+}
+
+FX_EsperarFormularioXmlOuModal(timeoutSecs := 20) {
+    startedAt := A_TickCount
+    deadline := startedAt + timeoutSecs * 1000
+
+    Loop {
+        if WinExist(MV_WIN_XML_PATH_FORM)
+            return Map("ok", true, "erro", "")
+
+        popup := FX_ModalAtivo()
+        if (popup != "") {
+            ; Modal pós-1 Faturamento é continuável. Não depender do texto desenhado.
+            if MV_ClickModalButtonByText(popup, "&OK")
+                MV_PollMs(() => FX_ModalAtivo() = "", MV_TIMEOUT_ACOE * 1000)
+            else
+                return Map("ok", false, "erro", "Modal após 1 Faturamento apareceu, mas não encontrei botão &OK acessível.")
+        }
+
+        if (A_TickCount >= deadline)
+            return Map("ok", false, "erro", "A tela de caminho do XML não apareceu após tratar possíveis modais em " timeoutSecs "s.")
+
+        Sleep MV_POLL_MS
+    }
+}
+
+FX_TratarModaisXmlSalvo() {
+    Loop 5 {
+        if !MV_PollMs(() => FX_ModalAtivo() != "", 2000) {
+            if MV_WaitOracleSettled(MV_WIN_XML_PATH_FORM, MV_FINAL_STABLE_MS, 5000)
+                return Map("ok", true, "erro", "")
+            continue
+        }
+
+        popup := FX_ModalAtivo()
+
+        ; Modal de sobrescrita: tem Sim e Não. Política do módulo: nunca sobrescrever.
+        if (MV_ModalHasButton(popup, "&Sim") && MV_ModalHasButton(popup, "&Não")) {
+            if !MV_ClickModalButtonByText(popup, "&Não")
+                return Map("ok", false, "erro", "Modal com Sim/Não apareceu, mas não consegui clicar Não.")
+            Notify("Modal com Sim/Não respondido com Não (política: não sobrescrever XML).")
+        } else if (MV_ClickModalButtonByText(popup, "&OK") || MV_ClickFirstControl(popup, MV_MODAL_OK_CLASS)) {
+            Notify("Modal informativo do XML fechado com OK.")
+        } else {
+            return Map("ok", false, "erro", "Modal do XML apareceu, mas não encontrei botão seguro (&Não ou &OK).")
+        }
+
+        if !FX_EsperarModalFechar(MV_TIMEOUT_ACOE * 1000)
+            return Map("ok", false, "erro", "O modal do XML foi acionado, mas não fechou em tempo.")
+    }
+
+    return Map("ok", false, "erro", "O XML não estabilizou após salvar e tratar os modais.")
+}
+
+; ════════════════════════════════════════════════════════════════
+;  MODAIS, RECUPERAÇÃO E SAÍDA
+; ════════════════════════════════════════════════════════════════
+
+FX_ModalAtivo() {
+    if WinExist(MV_FORMS_MODAL)
+        return MV_FORMS_MODAL
+    if WinExist(MV_WIN_MSG_USER)
+        return MV_WIN_MSG_USER
+    return ""
+}
+
+FX_EsperarQualquerModal(timeoutSecs) {
+    return MV_PollMs(() => FX_ModalAtivo() != "", timeoutSecs * 1000)
+}
+
+FX_EsperarModalFechar(timeoutMs := 30000) {
+    return MV_PollMs(() => FX_ModalAtivo() = "", timeoutMs)
+}
+
+FX_DescartarModalSeguro() {
+    if (FX_ModalAtivo() = "")
+        return true
+
+    ; Ordem: rótulo explícito do botão e, em último caso, o primeiro botão do modal.
+    ; Nenhuma coordenada é inventada aqui — se não houver botão visível, o fluxo aborta
+    ; para o operador resolver na tela em vez de clicar no escuro.
+    acoes := [["rotulo", "&OK"], ["rotulo", "&Não"], ["primeiro", MV_MODAL_OK_CLASS]]
+
+    for _, acao in acoes {
+        popup := FX_ModalAtivo()
+        if (popup = "")
+            return true
+
+        clicou := (acao[1] = "rotulo")
+            ? MV_ClickModalButtonByText(popup, acao[2])
+            : MV_ClickFirstControl(popup, acao[2])
+
+        if clicou && FX_EsperarModalFechar(MV_TIMEOUT_ACOE * 1000)
+            return true
+    }
+
+    return false
+}
+
+FX_TextoModalSeguro() {
+    popup := FX_ModalAtivo()
+    if (popup = "")
+        return "(sem modal)"
+
+    ; WinGetText/Window Spy normalmente expõem só os botões desses modais. A mensagem real
+    ; vem do OCR; este texto serve apenas como diagnóstico rápido.
+    try texto := Trim(WinGetText(popup))
+    catch as e
+        texto := "<erro WinGetText: " e.Message ">"
+
+    if (texto = "" || texto = "&OK" || InStr(texto, "&Sim") || InStr(texto, "&Não"))
+        return texto " (observação: o Oracle Forms desenha a mensagem em ui60Drawn; use FFCV_ClassifyErrorModal para ler o texto)"
+
+    return texto
+}
+
+FX_RecuperarTelas() {
+    ; Executado ao fim de cada remessa, inclusive em caso de erro: devolve o FFCV ao menu
+    ; para a próxima execução começar de um estado limpo.
+    ; NUNCA usar WinClose no Oracle Forms — perde o estado da aplicação.
+    try {
+        if (FX_ModalAtivo() != "") {
+            if FX_DescartarModalSeguro()
+                Notify("Recuperação: modal pendente foi fechado.")
+            else
+                Notify("Recuperação: há um modal aberto e não encontrei botão seguro para fechá-lo. Resolva na tela.")
+        }
+
+        if WinExist(MV_WIN_XML_PATH_FORM) {
+            Notify("Recuperação: voltando da tela de caminho do XML.")
+            MV_ClickBySpec(MV_WIN_XML_PATH_FORM, MV_XML_FORM_BTN_VOLTAR, MV_XML_FORM_BTN_VOLTAR_X, MV_XML_FORM_BTN_VOLTAR_Y)
+            Sleep MV_DELAY_INPUT
+        }
+
+        if WinExist(MV_WIN_XML_TISS) {
+            ; PENDENTE: MV_XML_BTN_SAIR_TELA está vazio; a saída provisória é {Esc}.
+            Notify("Recuperação: {Esc} na tela XML/TISS.")
+            Send "{Esc}"
+            Sleep MV_DELAY_INPUT
+        }
+
+        if WinExist(MV_WIN_FFCV_DATAS) {
+            ; Fase 4 do spec: reabrir a tela de entrega a cada iteração exige voltar ao menu.
+            ; O MV reaproveita o mesmo HWND ao voltar ao menu, então "a janela sumiu" não é
+            ; prova isolada: exigir também a estabilidade do FFCV.
+            if (Trim(MV_ENTREGA_SAIR_ATALHO) != "" && MV_EnsureWindowActive(MV_WIN_FFCV_DATAS)) {
+                Notify("Recuperação: saída da tela de entrega por " MV_ENTREGA_SAIR_ATALHO ".")
+                Send MV_ENTREGA_SAIR_ATALHO
+                MV_Poll(() => !WinExist(MV_WIN_FFCV_DATAS), MV_TIMEOUT_ACOE)
+            } else {
+                Notify("PENDENTE: sem atalho de saída válido, a tela de entrega da remessa pode ter ficado aberta.")
+            }
+        }
+
+        MV_WaitOracleSettled(MV_WIN_FFCV_ANY, MV_FINAL_STABLE_MS, MV_FINAL_ACTION_TIMEOUT_MS)
+    } catch as e {
+        Notify("Aviso na recuperação de telas: " e.Message)
+    }
+}
+
+; ════════════════════════════════════════════════════════════════
+;  UTILITÁRIOS DO MÓDULO
+; ════════════════════════════════════════════════════════════════
+
+FX_ParseRemessas(str) {
+    resultado := []
     for _, item in StrSplit(str, ",") {
         remessa := Trim(item)
         if (remessa != "")
-            result.Push(remessa)
+            resultado.Push(remessa)
     }
-    return result
+    return resultado
 }
 
-FecharXML_Abort(msg) {
-    global gRunning
-    SendToUI(Map("type", "error", "message", msg))
+FX_LogResumo(fechadas, xmlPulados, pendencias, totalStart) {
+    Notify("Resumo: fechadas=" fechadas " | XML pulado=" xmlPulados " | pendências=" pendencias.Length " | total=" MV_FormatDuration(A_TickCount - totalStart))
+}
+
+FX_Abort(msg) {
+    ; Delega o erro ao contrato compartilhado e só então fecha o status da execução,
+    ; como o stub fazia.
+    result := MV_Abort(msg)
     SendToUI(Map("type", "status", "message", "Execução finalizada.", "running", false))
-    gRunning := false
-    return false
+    return result
 }
