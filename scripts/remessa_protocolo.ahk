@@ -397,7 +397,7 @@ RP_ColetarLinhasMovDoc(protocolo, primeiraLinha := "", avisos := []) {
         vistos[keyInicial] := true
         if RP_LinhaDevolvida(devolvidos, 1) {
             avisos.Push(Map("protocolo", protocolo, "conta", primeiraLinha["conta"],
-                "descricao", "não enviada à remessa: documento marcado como devolvido no MOV DOC"))
+                "descricao", "Conta devolvida"))
             Notify("Conta " primeiraLinha["conta"] " devolvida — não segue para a remessa.")
         } else {
             linhas.Push(primeiraLinha)
@@ -473,7 +473,7 @@ RP_ColetarLinhasVisiveisMovDoc(protocolo, linhas, vistos, avisos := []) {
             contaDev := RP_ReadMovDocGridField(MOVDOC_CONTA_X, rowY, "conta")
             if (contaDev != "" && contaDev != protocolo) {
                 avisos.Push(Map("protocolo", protocolo, "conta", contaDev,
-                    "descricao", "não enviada à remessa: documento marcado como devolvido no MOV DOC"))
+                    "descricao", "Conta devolvida"))
                 Notify("Conta " contaDev " devolvida — não segue para a remessa.")
             } else {
                 Notify("Aviso: linha " i " marcada como devolvida, mas não consegui ler a conta dela.")
