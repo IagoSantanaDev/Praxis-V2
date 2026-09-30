@@ -63,7 +63,13 @@ global gScripts := [
                 "hint","Ex: 34"),
             Map("id","setor_envio", "label","Setor de Envio",
                 "tipo","text",  "obrigatorio",true,
-                "hint","Ex: 365")
+                "hint","Ex: 365"),
+            Map("id","tipo",        "label","Tipo",
+                "tipo","select", "obrigatorio",true,
+                "opcoes",["Ambulatorial","Hospitalar"]),
+            Map("id","imprimir_salvar_envio", "label","Imprimir, Salvar e Enviar",
+                "tipo","select", "obrigatorio",true,
+                "opcoes",["Sim","Não"], "default","Sim")
         ]
     ),
     Map(
