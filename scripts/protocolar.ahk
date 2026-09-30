@@ -164,12 +164,13 @@ RunProtocolar(params) {
         PR_Fase5Finalizar(cfg)
         Progress(100)
     } catch as e {
-        PR_RecuperarTelas()
+        PR_RecuperarTelas(cfg)
         return PR_Abort(e.Message)
     }
 
-    ; Recuperação também roda no caminho feliz: devolve o MOV DOC a um estado previsível.
-    PR_RecuperarTelas()
+    ; Recuperação também roda no caminho feliz: devolve o MOV DOC a um estado previsível
+    ; e fecha a última tela com Ctrl+Q.
+    PR_RecuperarTelas(cfg)
 
     relatorio := "Protocolar concluído.`n`n"
     relatorio .= "Remessas: " cfg["remessas"] "`n"
@@ -845,7 +846,7 @@ PR_BaixarProtocolo(protocolo) {
     Sleep PR_DELAY_INPUT
 
     ; Ctrl+Q + Enter: fecha a tela de baixa e confirma. NUNCA usar WinClose no Forms.
-    Send MV_XML_BTN_SAIR_TELA
+    Send MV_SAIR_TELA_ATALHO
     if !PR_EsperarJanelaEstavel(MV_WIN_MOVDOC_ANY, PR_FINAL_STABLE_MS, PR_FINAL_TIMEOUT_MS)
         Notify("Aviso: o MOV DOC não estabilizou após o Ctrl+Q da baixa do protocolo " protocolo ".")
     Send "{Enter}"
@@ -862,7 +863,7 @@ PR_CorrigirSetorDaContaEBaixar(cfg, conta, setorRecebido) {
     ; Base: Fluxos/protocolar.ahk L473-L509.
     Notify("Conta " conta ": corrigindo o setor com " setorRecebido " como atual e "
         cfg["setorAtual"] " como envio.")
-    PR_RecuperarTelas()
+    PR_FecharPendencias()
 
     if !PR_AbrirTelaEnvio(setorRecebido, cfg["setorAtual"], cfg["tipo"])
         return PR_Erro("Conta " conta ": não consegui reabrir a tela de envio para corrigir o setor "
@@ -901,7 +902,7 @@ PR_CorrigirSetorDaContaEBaixar(cfg, conta, setorRecebido) {
     Notify("Conta " conta ": protocolo novo copiado do registro de envio: " protocoloNovo ".")
 
     ; Ctrl+Q para devolver o MOV DOC ao menu antes da baixa.
-    Send MV_XML_BTN_SAIR_TELA
+    Send MV_SAIR_TELA_ATALHO
     if !PR_EsperarJanelaEstavel(MV_WIN_MOVDOC_ANY, PR_FINAL_STABLE_MS, PR_FINAL_TIMEOUT_MS)
         Notify("Aviso: o MOV DOC não estabilizou após o Ctrl+Q da correção de setor da conta " conta ".")
 
@@ -969,11 +970,11 @@ PR_Fase5Finalizar(cfg) {
         return true
     }
 
-    Send MV_XML_BTN_SAIR_TELA
+    Send MV_SAIR_TELA_ATALHO
     if !PR_EsperarJanelaEstavel(MV_WIN_MOVDOC_ANY, PR_FINAL_STABLE_MS, PR_FINAL_TIMEOUT_MS)
-        Notify("Aviso: o MOV DOC não estabilizou após o Ctrl+Q final.")
+        Notify("Aviso: o MOV DOC não estabilizou após o Ctrl+Q da tela de envio.")
 
-    Notify("Relatório de registro de envio impresso e MOV DOC fechado.")
+    Notify("Relatório de registro de envio impresso e MOV DOC devolvido ao menu.")
     return true
 }
 
@@ -1341,29 +1342,39 @@ PR_JanelaVisivel(hwnd) {
         return false
 }
 
-PR_RecuperarTelas() {
-    ; Executado sempre, inclusive em erro: devolve o MV a um estado previsível
-    ; para a próxima execução. NUNCA usar WinClose nas janelas do ifrun60.EXE.
+PR_FecharPendencias() {
+    ; Limpa telas auxiliares SEM fechar o MV. Seguro para chamar no meio do fluxo.
+    if WinExist(PR_WIN_MV_MSG) {
+        ; O popup do MV NÃO é fechado às cegas: a classificação é o que decide
+        ; a ação, e o operador precisa do texto na tela.
+        Notify("Recuperação: há um popup do MV aberto. Ele NÃO foi fechado automaticamente —"
+            " a mensagem precisa ser lida. Resolva na tela antes de rodar de novo.")
+    }
+
+    if WinExist(PR_WIN_MOVREL_ENVIO) {
+        Notify("Recuperação: fechando o 'Relatório de Registro de Envio' pendente.")
+        PR_ClicarControle(PR_WIN_MOVREL_ENVIO, PR_MOVREL_BTN_SAIR)
+        PR_EsperarSumir(PR_WIN_MOVREL_ENVIO, PR_POPUP_QUEDA_TIMEOUT_MS)
+    }
+
+    PR_FecharRelatoriosDeFundo()
+}
+
+PR_RecuperarTelas(cfg) {
+    ; Só no FIM do fluxo: devolve o MV a um estado previsível e fecha a última tela.
+    ; No meio do fluxo use PR_FecharPendencias — fechar o MV ali quebraria a execução.
+    ; NUNCA usar WinClose nas janelas do ifrun60.EXE.
     try {
-        if WinExist(PR_WIN_MV_MSG) {
-            ; O popup do MV NÃO é fechado às cegas: a classificação é o que decide
-            ; a ação, e o operador precisa do texto na tela. A próxima execução
-            ; reencontra a tela e reexecuta a partir daqui.
-            Notify("Recuperação: há um popup do MV aberto. Ele NÃO foi fechado automaticamente —"
-                " a mensagem precisa ser lida. Resolva na tela antes de rodar de novo.")
+        PR_FecharPendencias()
+
+        ; imprimir/salvar = Não é a única exceção à saída obrigatória: o spec manda deixar o
+        ; MOV DOC aberto para o operador conferir. Nos demais casos o fluxo fecha o MV.
+        if !cfg["imprimir"] {
+            Notify("Recuperação: imprimir/salvar = Não, o MOV DOC permanece aberto para conferência.")
+            return
         }
 
-        if WinExist(PR_WIN_MOVREL_ENVIO) {
-            Notify("Recuperação: fechando o 'Relatório de Registro de Envio' pendente.")
-            PR_ClicarControle(PR_WIN_MOVREL_ENVIO, PR_MOVREL_BTN_SAIR)
-            PR_EsperarSumir(PR_WIN_MOVREL_ENVIO, PR_POPUP_QUEDA_TIMEOUT_MS)
-        }
-
-        if WinExist(PR_WIN_MOVDOC_ENVIO) {
-            Notify("Recuperação: a tela de envio ficou aberta. O próximo uso reabre a configuração a partir dela.")
-        }
-
-        PR_FecharRelatoriosDeFundo()
+        MV_FecharUltimaTela(MV_WIN_MOVDOC_ANY, "MOV DOC")
     } catch as e {
         Notify("Aviso na recuperação de telas: " e.Message)
     }
