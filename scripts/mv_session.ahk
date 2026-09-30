@@ -77,8 +77,11 @@ MV_SAIR_TELA_ATALHO := "^q"
 
 ; ── Controles tela de datas ───────────────────────────────────
 ; Tela "Cadastro: Faturas e Remessas". Coordenadas Client vindas de Window Spy.
-; Fonte versionada: .agents/workflows/01-remessa-protocolo.md (seção Constantes).
-; Capturas originais stão em Fluxos/, que é gitignored e não existe neste checkout.
+; Capturas originais estão em Fluxos/, que é gitignored e não existe neste checkout;
+; o spec que as trazia (.agents/workflows/01-remessa-protocolo.md) também não é
+; versionado. As coordenadas abaixo vieram do Window Spy do operador e não são
+; auditáveis em um clone novo — ao mexer aqui, exigir captura nova.
+; docs/analise-causa-raiz/06-sistematico-origem-das-constantes.md
 MV_DATAS_CAMPO_REMESSA    := "Edit5"
 MV_DATAS_CAMPO_REMESSA_X  := 59
 MV_DATAS_CAMPO_REMESSA_Y  := 101
@@ -98,8 +101,7 @@ MV_DATAS_BTN_VOLTAR       := "Button7"
 
 ; ── Controles tela XML ────────────────────────────────────────
 ; Tela "Monitoração de Faturamento - TISS". Coordenadas Client vindas de Window Spy.
-; Fonte versionada: .agents/workflows/01-remessa-protocolo.md (seção Constantes).
-; Capturas originais stão em Fluxos/, que é gitignored e não existe neste checkout.
+; Mesma ressalva de proveniência do bloco de datas acima: sem captura versionada.
 MV_XML_CAMPO_REMESSA   := "Edit1"
 MV_XML_CAMPO_REMESSA_X := 272
 MV_XML_CAMPO_REMESSA_Y := 89

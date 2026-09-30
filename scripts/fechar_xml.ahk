@@ -13,7 +13,10 @@
 ;   data_entrega    -> data de entrega
 ;   data_vencimento -> data de vencimento
 ;
-; Spec: .agents\workflows\03-fechar-xml.md
+; Spec previsto: .agents\workflows\03-fechar-xml.md — NÃO EXISTE no repositório
+; (.gitignore:16). As 7 divergências contra o fluxo validado foram deliberadas
+; contra esse spec, e a direção definida foi alinhar ao validado.
+; Análise e plano: docs/analise-causa-raiz/02-fechar-xml-divergencia-do-validado.md
 ;
 ; ── Escopo (armadilhas desta casa) ───────────────────────────────
 ; NÃO declarar #Include aqui. `mv_session.ahk` e `lib\FFCV_ErrorTemplates.ahk`

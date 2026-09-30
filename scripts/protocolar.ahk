@@ -8,7 +8,11 @@
 ; ════════════════════════════════════════════════════════════════
 ;  PROTOCOLAR
 ; ════════════════════════════════════════════════════════════════
-; Spec: .agents\workflows\02-protocolar.md
+; Spec previsto: .agents\workflows\02-protocolar.md — NÃO EXISTE no repositório
+; (.gitignore:16). As referências a "Fluxos/..." abaixo apontam para material que
+; também não é versionado; o fluxo validado está em
+; Praxis_TO-DO/Protocolar/protocolar.ahk, que é versionado.
+; docs/analise-causa-raiz/06-sistematico-origem-das-constantes.md
 ; Base: Fluxos\protocolar.ahk (2.200 l., 2026-06-22)
 ;
 ; Parâmetros da tela:

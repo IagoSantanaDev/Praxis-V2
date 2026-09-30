@@ -196,7 +196,37 @@ Erros aqui não dão erro visível: produzem tela errada, planilha errada ou rem
 - **Sair de tela no MV é Ctrl+Q**, confirmado pelo operador para **todas** as telas; no menu
   principal fecha o MV. Em AHK `^` é Ctrl, então `^q` **é** Ctrl+Q — não é valor suspeito. Uma
   constante só: `MV_SAIR_TELA_ATALHO` (`mv_session.ahk:57`). `{Esc}` foi descartado. Não "conserte"
-  por adivinhação.
+  por adivinhação. O fluxo validado acrescenta `{Enter}` depois do `^q` na baixa
+  (`Praxis_TO-DO/Protocolar/protocolar.ahk:1124`); o Praxis **não** faz isso, por decisão do
+  operador. Não "conserte" para incluir o `{Enter}`.
+- **No título de uma tela MDI do MV, o nome da tela aparece ENTRE COLCHETES** na raiz:
+  `Movimentação de Documentos - [Protocolação de Baixa de Documentos - HOSPITAL SAO RAFAEL]`,
+  classe `ui60MDIroot_W32`. Com `SetTitleMatchMode 2` (substring), um `WinExist` que procure o
+  nome da child **resolve para a raiz**, e o `hwnd` devolvido tem um título que não contém mais o
+  texto procurado. O `^q` é processado pela child, então ativar a raiz não fecha a tela. Para
+  **saída de tela**, use a constante que casa **fora** dos colchetes (`MV_WIN_MOVDOC_ANY`,
+  `MV_WIN_FFCV_ANY`); para **esperar e clicar** na tela, a que casa dentro
+  (`MV_WIN_MOVDOC_BAIXA`) está correta. Confundir as duas é o que fazia o `^q` não sair da baixa
+  enquanto funcionava no FFCV.
+- **Verificar "a tela mudou" por estabilidade é errado.** `MV_WaitOracleSettled` usava só a
+  **contagem de controles**, e o MV troca de tela no mesmo HWND sem alterar essa contagem — uma
+  tecla engolida produz uma tela "perfeitamente estável". Medido: mesmo HWND, contagem 1 → 1,
+  só o título mudou. Por isso `MV_FecharUltimaTela` agora compara a **assinatura de tela**
+  (`MV_ScreenSignature`, inclui título) antes e depois, e `MV_WaitTelaSaiu` só aceita como
+  sucesso a janela sumida **ou** a assinatura mudada. Regra geral: **estabilidade não prova
+  transição**; exija uma assinatura que inclua o título, e nunca reporte sucesso sem ela.
+- **`PR_JanelaVisivel` mascarava o bit errado** (`protocolar.ahk`): testava `0x1000000`, que é
+  `WS_MAXIMIZE`, com o comentário dizendo `WS_VISIBLE` (que é `0x10000000`). Reprovava toda janela
+  normal — inclusive o diálogo "Salvar como" — e desligava em silêncio 5 dos 6 fallbacks de
+  `PR_EsperarPopupRemessa` **e** `PR_EsperarPopupMv`, que é o que detectava erro por conta no
+  Protocolar: sem ele, **toda conta era contada como aceita** e `PR_TratarPopup` nunca rodava.
+  Bit de estilo Win32: confira o valor, não confie no comentário. `WinGetStyle` é o único jeito
+  de testar visibilidade, e o valor certo é `0x10000000`.
+- **`MV_ClickBySpec` degrada para clique cego por coordenada** quando o `ClassNN` não casa
+  (`mv_session.ahk:654`): tenta `MV_ClickControlAt`, e se falhar clica no ponto `(x, y)` e devolve
+  `true` do mesmo jeito. Um `ClassNN` errado vira **ação errada sem erro**. Não é possível, pelo
+  retorno, distinguir clique no controle de clique na coordenada. Prefira `MV_ClickFirstControl`
+  (sem coordenada) quando só o `ClassNN` importa.
 - **Todo fim de fluxo fecha a última tela**, via `MV_FecharUltimaTela` (`mv_session.ahk:513`). Duas
   exceções: popup do MV aberto (não fechar — o operador precisa ler a mensagem) e
   `imprimir_salvar_envio = Não` no protocolar (deixar o MOV DOC aberto para conferência).
