@@ -51,12 +51,15 @@ MV_WIN_XML_PATH_FORM := "MV2000i - Faturamento - [WIN_PRINCIPAL]"
 ; Atalho: Lançamentos → Monitoração de Faturamento - TISS.
 ; Confirmado contra o MV2000i pelo operador. Spy em Fluxos/Teste_corrigido.ahk L314.
 MV_TISS_ATALHO := "{Alt down}lmm{Enter}{Alt up}"
-; PENDENTE: Esc não sai da tela Entrega de Remessas. Quando descobrir o atalho correto,
-; preencha aqui, ex.: MV_ENTREGA_SAIR_ATALHO := "!x" ou "{F4}".
+; PENDENTE: "^q" está preenchido mas NUNCA foi validado contra o MV2000i real.
+; Esc foi descartado porque não sai da tela. Não troque este valor por coordenada adivinhada.
+; Se a tela de Entrega de Remessas não fechar, isso quebra o fluxo a partir daqui.
 MV_ENTREGA_SAIR_ATALHO := "^q"
 
 ; ── Controles tela de datas ───────────────────────────────────
-; Spy em Fluxos/Fluxo_FecharRemessa: tela "Cadastro: Faturas e Remessas".
+; Tela "Cadastro: Faturas e Remessas". Coordenadas Client vindas de Window Spy.
+; Fonte versionada: .agents/workflows/01-remessa-protocolo.md (seção Constantes).
+; Capturas originais stão em Fluxos/, que é gitignored e não existe neste checkout.
 MV_DATAS_CAMPO_REMESSA    := "Edit5"
 MV_DATAS_CAMPO_REMESSA_X  := 59
 MV_DATAS_CAMPO_REMESSA_Y  := 101
@@ -75,7 +78,9 @@ MV_DATAS_BTN_CONFIRMAR_Y  := 426
 MV_DATAS_BTN_VOLTAR       := "Button7"
 
 ; ── Controles tela XML ────────────────────────────────────────
-; Spy em Fluxos/Fluxo_XML: tela "Monitoração de Faturamento - TISS".
+; Tela "Monitoração de Faturamento - TISS". Coordenadas Client vindas de Window Spy.
+; Fonte versionada: .agents/workflows/01-remessa-protocolo.md (seção Constantes).
+; Capturas originais stão em Fluxos/, que é gitignored e não existe neste checkout.
 MV_XML_CAMPO_REMESSA   := "Edit1"
 MV_XML_CAMPO_REMESSA_X := 272
 MV_XML_CAMPO_REMESSA_Y := 89
@@ -93,7 +98,9 @@ MV_XML_BTN_NAO           := "Button2"
 MV_XML_FORM_BTN_VOLTAR   := "Button7" ; Voltar
 MV_XML_FORM_BTN_VOLTAR_X := 731       ; Window Spy: client x do Button7
 MV_XML_FORM_BTN_VOLTAR_Y := 470       ; Window Spy: client y do Button7
-MV_XML_BTN_SAIR_TELA     := ""        ; pendente
+; PENDENTE: vazio. O atalho correto de saída da tela TISS nunca foi descoberto; hoje os
+; fluxos saem com {Esc}, que funciona mas não foi validado contra o MV2000i real.
+MV_XML_BTN_SAIR_TELA     := ""
 
 ; ── Polling / estabilidade ────────────────────────────────────
 MV_POLL_MS          := 100
