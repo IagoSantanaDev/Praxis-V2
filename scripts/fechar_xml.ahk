@@ -197,8 +197,9 @@ FX_PreencherDatasPorTeclado(remessaParam, dataEntrega, dataVencimento) {
         return Map("ok", false, "erro", "A tela de entrega de datas não ficou ativa para preencher as datas.", "remessaTela", "")
 
     ; Contrato validado no teste 12: ancorar o foco em Data de Entrega, Shift+Tab chega ao
-    ; número da remessa, Tab volta para Data de Entrega e Enter avança para Data Prevista.
-    ; NÃO usar Ctrl+A: o Forms trata o atalho de forma imprevisível nos campos de data.
+    ; número da remessa, Tab volta para Data de Entrega.
+    ; Digitar caractere a caractere nos campos de data é o que o Forms trata de
+    ; forma inconsistente; a escrita é por colar, como no fluxo validado.
     CoordMode("Mouse", "Client")
     Click(MV_DATAS_CAMPO_ENTREGA_X + 15, MV_DATAS_CAMPO_ENTREGA_Y + 8, 1)
     Sleep MV_KEY_SETTLE_MS
@@ -218,14 +219,18 @@ FX_PreencherDatasPorTeclado(remessaParam, dataEntrega, dataVencimento) {
         Notify("Atenção: não consegui ler o número da remessa na tela de datas. Seguindo com o parâmetro " remessaParam ".")
     }
 
+    ; Navegação e escrita por Tab + colar, como o fluxo validado
+    ; (Fechar&XML.ahk:154-158). O Enter entre os campos de data foi removido:
+    ; o validado não o usa, e no Oracle Forms ele commitava o campo e podia
+    ; disparar a validação antes do segundo campo estar preenchido.
+    ; Colar em vez de digitar porque o Forms trata digitação longa de forma
+    ; inconsistente nos campos de data.
     Send("{Tab}")
     Sleep MV_KEY_SETTLE_MS
-    SendText MV_NormalizarDataBr(dataEntrega)
+    FX_ColarNoFoco(MV_NormalizarDataBr(dataEntrega))
+    Send("{Tab}")
     Sleep MV_KEY_SETTLE_MS
-    Send("{Enter}")
-    Sleep MV_KEY_SETTLE_MS
-    SendText MV_NormalizarDataBr(dataVencimento)
-    Sleep MV_KEY_SETTLE_MS
+    FX_ColarNoFoco(MV_NormalizarDataBr(dataVencimento))
 
     ; Conferência de ida e volta: a tela é lida depois do preenchimento para
     ; confirmar que o FFCV recebeu dd/mm/aaaa. Sem isto, um formato divergente
@@ -237,6 +242,26 @@ FX_PreencherDatasPorTeclado(remessaParam, dataEntrega, dataVencimento) {
 
     Notify("Datas enviadas por teclado: entrega " MV_NormalizarDataBr(dataEntrega) ", vencimento " MV_NormalizarDataBr(dataVencimento) ".")
     return Map("ok", true, "erro", "", "remessaTela", remessaTela)
+}
+
+; Cola o texto no campo com foco, verificando antes que o clipboard ficou
+; exato. Sem essa verificação, uma falha de clipboard vira um campo em branco
+; que o FFCV aceita sem reclamar. Espelha o PasteFocused do fluxo validado
+; (Fechar&XML.ahk:430-446), sem restauração de cursor: aqui o chamador já
+; garante a janela ativa.
+FX_ColarNoFoco(texto) {
+    anterior := ClipboardAll()
+    A_Clipboard := texto
+    if !ClipWait(1) {
+        A_Clipboard := anterior
+        return false
+    }
+    Send "^a"
+    Sleep MV_KEY_SETTLE_MS
+    Send "^v"
+    Sleep MV_KEY_SETTLE_MS
+    A_Clipboard := anterior
+    return true
 }
 
 FX_CopyFocusedNumericText(timeoutMs := 600) {
@@ -378,9 +403,16 @@ FX_GerarXml(remessa) {
     if !FX_AbrirTelaTiss()
         return Map("estado", "erro", "erro", "A tela de XML/TISS não abriu para a remessa " remessa ".")
 
-    if !MV_SetTextByClickNoClear(MV_WIN_XML_TISS, MV_XML_CAMPO_REMESSA_X, MV_XML_CAMPO_REMESSA_Y, remessa)
-        return Map("estado", "erro", "erro", "Não consegui preencher a remessa " remessa " na tela XML/TISS.")
+    ; Preenchimento por teclado, como o fluxo validado (Fechar&XML.ahk:328):
+    ; {Tab 5} chega ao campo da remessa e o texto é colado. O MV_ClickBySpec
+    ; por coordenada ficava aqui, e é o que produz clique cego quando o
+    ; ClassNN não casa (docs/analise-causa-raiz/06).
+    if !MV_EnsureWindowActive(MV_WIN_XML_TISS)
+        return Map("estado", "erro", "erro", "A tela de XML/TISS não ficou ativa para a remessa " remessa ".")
+    Send "{Tab 5}"
     Sleep MV_KEY_SETTLE_MS
+    if !FX_ColarNoFoco(remessa)
+        return Map("estado", "erro", "erro", "Não consegui colar a remessa " remessa " na tela XML/TISS.")
     Send "{F8}"
 
     consulta := FX_EsperarConsultaXmlPronta(MV_FINAL_ACTION_TIMEOUT_MS)
@@ -398,8 +430,14 @@ FX_GerarXml(remessa) {
     if !DirExist(xmlDir)
         DirCreate xmlDir
 
-    if !MV_SetTextByClickAt(MV_WIN_XML_PATH_FORM, MV_XML_FORM_CAMPO_PATH_X, MV_XML_FORM_CAMPO_PATH_Y, xmlPath)
-        return Map("estado", "erro", "erro", "Não consegui preencher o caminho do XML da remessa " remessa ".")
+    ; Caminho do XML por teclado, como o validado (Fechar&XML.ahk:396-399):
+    ; Tab para o campo, cola, Tab e Enter.
+    if !MV_EnsureWindowActive(MV_WIN_XML_PATH_FORM)
+        return Map("estado", "erro", "erro", "A tela de caminho do XML não ficou ativa para a remessa " remessa ".")
+    Send "{Tab}"
+    Sleep MV_KEY_SETTLE_MS
+    if !FX_ColarNoFoco(xmlPath)
+        return Map("estado", "erro", "erro", "Não consegui colar o caminho do XML da remessa " remessa ".")
     if !MV_WaitOracleSettled(MV_WIN_XML_PATH_FORM, MV_FINAL_STABLE_MS, MV_FINAL_ACTION_TIMEOUT_MS)
         return Map("estado", "erro", "erro", "A tela de caminho do XML da remessa " remessa " não estabilizou antes de salvar.")
 
@@ -495,10 +533,21 @@ FX_EsperarFormularioXmlOuModal(timeoutSecs := 20) {
 }
 
 FX_TratarModaisXmlSalvo() {
+    ; O fluxo validado exige que o popup de confirmação do MV APAREÇA
+    ; (Fechar&XML.ahk:405-422) e lança erro se não aparecer. Sem essa exigência,
+    ; "nenhum modal apareceu" era aceito como sucesso — e aí nada distingue
+    ; "o MV confirmou" de "o MV não respondeu", que é o mesmo defeito de
+    ; verificação do doc 04. `confirmou` só é verdadeiro depois de um popup
+    ; tratado com OK, nunca por ausência de popup.
+    confirmou := false
+
     Loop 5 {
         if !MV_PollMs(() => FX_ModalAtivo() != "", 2000) {
-            if MV_WaitOracleSettled(MV_WIN_XML_PATH_FORM, MV_FINAL_STABLE_MS, 5000)
+            if confirmou
                 return Map("ok", true, "erro", "")
+            if MV_WaitOracleSettled(MV_WIN_XML_PATH_FORM, MV_FINAL_STABLE_MS, 5000)
+                return Map("ok", false,
+                    "erro", "O MV não exibiu confirmação ao salvar o XML. O arquivo pode não ter sido gravado.")
             continue
         }
 
@@ -511,6 +560,7 @@ FX_TratarModaisXmlSalvo() {
             Notify("Modal com Sim/Não respondido com Não (política: não sobrescrever XML).")
         } else if (MV_ClickModalButtonByText(popup, "&OK") || MV_ClickFirstControl(popup, MV_MODAL_OK_CLASS)) {
             Notify("Modal informativo do XML fechado com OK.")
+            confirmou := true
         } else {
             return Map("ok", false, "erro", "Modal do XML apareceu, mas não encontrei botão seguro (&Não ou &OK).")
         }
