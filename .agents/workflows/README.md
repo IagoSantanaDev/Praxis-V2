@@ -9,8 +9,12 @@ leia o spec dele aqui.
 | # | Workflow | Script | Status |
 |---|----------|--------|--------|
 | 01 | [Remessa por Protocolo](01-remessa-protocolo.md) | `scripts/remessa_protocolo.ahk` | **Implementado e validado no MV** |
-| 02 | [Protocolar](02-protocolar.md) | `scripts/protocolar.ahk` | A implementar (stub) |
-| 03 | [Fechar e Gerar XML](03-fechar-xml.md) | `scripts/fechar_xml.ahk` | A implementar (stub) |
+| 02 | [Protocolar](02-protocolar.md) | `scripts/protocolar.ahk` | **Implementado, não validado no MV** |
+| 03 | [Fechar e Gerar XML](03-fechar-xml.md) | `scripts/fechar_xml.ahk` | **Implementado, não validado no MV** |
+
+"Implementado" significa que o fluxo existe em código e compila. **Nenhum dos dois rodou contra o
+MV2000i real** — atalhos de menu, `{Down 121}` e coordenadas continuam não validados. O único gate
+automatizado é o build + `--integrity-check`, que não prova comportamento.
 
 ## Material de referência
 
@@ -48,21 +52,20 @@ Script: `scripts/<arquivo>.ahk`   |   Registro: `gScripts` id `<id>`
 
 ## Estado atual vs. estado descrito
 
-Os specs usam prefixo `MV_` para o contrato de janela, mas **essa extração ainda não foi feita**.
-Hoje o que existe em `scripts/remessa_protocolo.ahk` ainda é `RP_*` e o atalho do TISS está
-embutido na função `RP_AbrirTelaTISS`, não em constante.
+A extração para o prefixo `MV_` **foi feita**. O contrato de janela compartilhado está em
+`scripts/mv_session.ahk`, incluído por `scripts/remessa_protocolo.ahk`. Os specs citam `MV_*` e o
+código agora corresponde.
 
-| Nome citado nos specs | Existe hoje | Onde |
-|------------------------|--------------|------|
-| `MV_TISS_ATALHO` | **não** — embutido em `RP_AbrirTelaTISS`, já com o valor confirmado | `scripts/remessa_protocolo.ahk` L1368 |
-| `MV_ENTREGA_SAIR_ATALHO` | não — é `RP_ENTREGA_SAIR_ATALHO` | `scripts/remessa_protocolo.ahk` L107 |
-| `MV_XML_BTN_SAIR_TALA` → `MV_XML_BTN_SAIR_TELA` | não — é `XML_BTN_SAIR_TELA` | `scripts/remessa_protocolo.ahk` L128 |
-| `MV_WaitOracleSettled` | não — é `RP_WaitOracleSettled` | `scripts/remessa_protocolo.ahk` L1427 |
-| `MV_EnsureWindowActive` | não — é `RP_EnsureWindowActive` | `scripts/remessa_protocolo.ahk` L1396 |
-| `MV_Abort` | não — é `RP_Abort` | `scripts/remessa_protocolo.ahk` L1724 |
+| Nome citado nos specs | Onde está |
+|------------------------|----------|
+| `MV_TISS_ATALHO` | `scripts/mv_session.ahk` — constante, com o valor confirmado pelo operador |
+| `MV_ENTREGA_SAIR_ATALHO` | `scripts/mv_session.ahk` — `^q`, **não validado** |
+| `MV_XML_BTN_SAIR_TELA` | `scripts/mv_session.ahk` — vazio, saída usa `{Esc}` |
+| `MV_WaitOracleSettled`, `MV_EnsureWindowActive`, `MV_ClickBySpec`, `MV_SetTextByClickAt` | `scripts/mv_session.ahk` |
+| `MV_Abort` | `scripts/mv_session.ahk` — `RP_Abort` virou wrapper de uma linha |
 
-Grep por `MV_` em `scripts/` **não** encontra essas funções. Ao implementar a extração, promova
-cada uma e atualize este quadro; até lá, os specs descrevem o destino, não o código.
+Os fluxos 02 e 03 **não** podem chamar funções `RP_` nem `FX_` um do outro: cada um tem helpers
+próprios com prefixo próprio (`PR_` e `FX_`), porque `#Include` é textual e de escopo global.
 
 ### Atalhos já confirmados contra o MV2000i
 

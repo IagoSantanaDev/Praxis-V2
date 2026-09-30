@@ -13,11 +13,18 @@ as regras abaixo seriam as únicas carregadas automaticamente.
   `scripts/remessa_protocolo.ahk`. **Não re-inclua** `mv_session.ahk` em `protocolar.ahk` ou
   `fechar_xml.ahk`: duplica todas as funções `MV_*` e o build quebra.
 - **`gScripts` em `main.ahk` está duplicado em `devSim()` dentro de `ui/index.html`.** Alterar
-  `id`, `label`, `tipo` ou `obrigatorio` de um parâmetro exige editar os dois lugares, senão a
-  UI em modo dev mostra o formulário errado.
+  `id`, `label`, `tipo`, `obrigatorio`, `opcoes` ou `default` de um parâmetro exige editar os dois
+  lugares, senão a UI em modo dev mostra o formulário errado.
+- **Os três fluxos existem em código; só um rodou no MV.** `remessa_protocolo.ahk` é o validado.
+  `protocolar.ahk` (`PR_*`) e `fechar_xml.ahk` (`FX_*`) compilam mas **nunca rodaram contra o MV2000i**.
+  Build e `--integrity-check` provam sintaxe, include e asset — não comportamento.
+- **Os fluxos não se chamam.** `protocolar.ahk` não chama `RP_*` nem `FX_*`; `fechar_xml.ahk` não
+  chama `RP_*` nem `PR_*`. Helper compartilhado novo sobe para `mv_session.ahk` com prefixo `MV_`.
 - **Automação do MV só está validada depois de rodar contra o MV2000i real.** Se você não rodou,
   diga isso explicitamente em vez de afirmar que funciona. `PENDENTE` significa `PENDENTE`.
-- **Não "conserte" constante pendente por adivinhação de coordenada de tela.**
+- **Não "conserte" constante pendente por adivinhação de coordenada de tela.** São pendentes
+  `MV_ENTREGA_SAIR_ATALHO` (`^q`, preenchido e nunca validado) e `MV_XML_BTN_SAIR_TELA` (vazio).
+  `{Down 121}` em `protocolar.ahk` é posicional e depende da ordenação do relatório na estação.
 
 ## Regras de automação (MV2000i / Oracle Forms 6i)
 

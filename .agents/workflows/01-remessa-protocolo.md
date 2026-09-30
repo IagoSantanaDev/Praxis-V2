@@ -39,20 +39,20 @@ MOVDOC_GRID_ROWS_Y := [222, 245, 268, 291]
 MOVDOC_CHECK_RECEBIDO_CLASS := "Button1"
 MOVDOC_CHECK_RECEBIDO_X := 718   MOVDOC_CHECK_RECEBIDO_Y := 359
 
-; Spy em Fluxos/Fluxo_FecharRemessa: tela "Cadastro: Faturas e Remessas"
-DATAS_CAMPO_REMESSA    := "Edit5"   ; 59, 101
-DATAS_CAMPO_ENTREGA    := "Edit1"   ; 146, 101
-DATAS_CAMPO_VENCIMENTO := "Edit1"   ; 244, 227  ← mesmo ClassNN do anterior, ponto diferente
-DATAS_CHECKBOX         := "Button3" ; 541, 242
-DATAS_BTN_CONFIRMAR    := "Button10"; 30, 426
+; Tela "Cadastro: Faturas e Remessas". Coordenadas Client vindas de Window Spy.
+MV_DATAS_CAMPO_REMESSA    := "Edit5"   ; 59, 101
+MV_DATAS_CAMPO_ENTREGA    := "Edit1"   ; 146, 101
+MV_DATAS_CAMPO_VENCIMENTO := "Edit1"   ; 244, 227  ← mesmo ClassNN do anterior, ponto diferente
+MV_DATAS_CHECKBOX         := "Button3" ; 541, 242
+MV_DATAS_BTN_CONFIRMAR    := "Button10"; 30, 426
 
-; Spy em Fluxos/Fluxo_XML: tela "Monitoração de Faturamento - TISS"
+; Tela "Monitoração de Faturamento - TISS". Coordenadas Client vindas de Window Spy.
 MV_TISS_ATALHO          := "{Alt down}lmm{Enter}{Alt up}"  ; CONFIRMADO no MV pelo operador
-XML_CAMPO_REMESSA       := "Edit1" ; 272, 89
-XML_BTN_FATURAMENTO     := "Button7"; 12, 446  ; 1 Faturamento
-XML_FORM_CAMPO_PATH     := "Edit1" ; 267, 467
-XML_FORM_BTN_SALVAR     := "Button4"; 623, 471
-XML_FORM_BTN_VOLTAR     := "Button7"; 731, 470
+MV_XML_CAMPO_REMESSA       := "Edit1" ; 272, 89
+MV_XML_BTN_FATURAMENTO     := "Button7"; 12, 446  ; 1 Faturamento
+MV_XML_FORM_CAMPO_PATH     := "Edit1" ; 267, 467
+MV_XML_FORM_BTN_SALVAR     := "Button4"; 623, 471
+MV_XML_FORM_BTN_VOLTAR     := "Button7"; 731, 470
 
 ; Popups sem título próprio: detectados por sentinela dentro da janela FFCV
 FFCV_POPUP_CONTA_SENTINEL_CLASS := "ui60Drawn W323"  ; 432, 109
@@ -112,26 +112,26 @@ vez de clicar num `EditN` que pode renumerar. Não troque por coordenada sem nov
 
 Só roda quando `data_entrega` **e** `data_vencimento` vieram preenchidas.
 
-1. Clicar `FFCV_BTN_ABRIR_DATAS` (`Button6`, 464, 458) e esperar `WIN_FFCV_DATAS`.
+1. Clicar `FFCV_BTN_ABRIR_DATAS` (`Button6`, 464, 458) e esperar `MV_WIN_FFCV_DATAS`.
 2. Preencher por teclado, na ordem validada — **não usar Ctrl+A**:
    - clicar em Data de Entrega (146+15, 101+8)
    - `{+Tab}` → lê o nº da remessa com `Ctrl+C` (fallback do campo `Edit5`)
    - `{Tab}` → volta para Data de Entrega → `SendText dataEntrega` → `{Enter}` → `SendText dataVenc`
 3. Checkbox "Fechar contas sem imprimir faturas" (`Button3`, 541, 242): ler estado com
    `MV_ControlCheckedAt`; clicar só se `0`. Estado vazio = erro, não siga.
-4. Confirmar: `DATAS_BTN_CONFIRMAR` (`Button10`, 30, 426).
+4. Confirmar: `MV_DATAS_BTN_CONFIRMAR` (`Button10`, 30, 426).
 5. Modal de confirmação → clicar **Não** (`RP_ClickNaoModal`).
-6. Tela de impressão (`WIN_CAPA_REMESSA`) → `MV_WaitOracleSettled` → `{Enter}` → esperar fechar.
-7. Sair da tela de Entrega: `RP_ENTREGA_SAIR_ATALHO` (atual `^q`), depois estabilizar o FFCV.
+6. Tela de impressão (`MV_WIN_CAPA_REMESSA`) → `MV_WaitOracleSettled` → `{Enter}` → esperar fechar.
+7. Sair da tela de Entrega: `MV_ENTREGA_SAIR_ATALHO` (atual `^q`), depois estabilizar o FFCV.
 
 ### Fase 4 — Gerar XML (`GerarXML`)
 
-1. Abrir **instância nova** de TISS: `Send MV_TISS_ATALHO`, esperar `WIN_XML`.
-2. `RP_SetTextByClickNoClear` no campo remessa (272, 89) → `SendText` → `{F8}`.
-3. `RP_WaitXmlQueryReady`: sem modal, botão `XML_BTN_FATURAMENTO` habilitado, cursor não em
+1. Abrir **instância nova** de TISS: `Send MV_TISS_ATALHO`, esperar `MV_WIN_XML_TISS`.
+2. `MV_SetTextByClickNoClear` no campo remessa (272, 89) → `SendText` → `{F8}`.
+3. `RP_WaitXmlQueryReady`: sem modal, botão `MV_XML_BTN_FATURAMENTO` habilitado, cursor não em
    `Wait`, estável por `RP_FINAL_STABLE_MS` (800 ms), e no mínimo `RP_XML_QUERY_MIN_WAIT_MS`
    (1.200 ms) desde o F8.
-4. Clicar `XML_BTN_FATURAMENTO` (`Button7`, 12, 446) → `RP_WaitXmlFormOrModal`. Modal pós-clique
+4. Clicar `MV_XML_BTN_FATURAMENTO` (`Button7`, 12, 446) → `RP_WaitXmlFormOrModal`. Modal pós-clique
    é continuável: fecha por `&OK` e segue.
 5. Caminho: `<gWorkDir>\XML\<remessa>.xml`; criar o diretório se faltar. `gWorkDir` vem de
    `config.ini` (`Paths/WorkDir`), default `%USERPROFILE%\Documents\Praxis`.
@@ -164,8 +164,8 @@ Só roda quando `data_entrega` **e** `data_vencimento` vieram preenchidas.
 
 | Item | Situação |
 |------|----------|
-| `RP_ENTREGA_SAIR_ATALHO` | preenchido com `^q`; **não validado** contra o MV. `Esc` foi descartado por não sair da tela. |
-| `XML_BTN_SAIR_TELA` | vazio. A saída usa `{Esc}` em `RP_SairTelaAtual`. Atalho correto nunca foi descoberto. |
+| `MV_ENTREGA_SAIR_ATALHO` | preenchido com `^q`; **não validado** contra o MV. `Esc` foi descartado por não sair da tela. |
+| `MV_XML_BTN_SAIR_TELA` | vazio. A saída usa `{Esc}` em `RP_SairTelaAtual`. Atalho correto nunca foi descoberto. |
 | `FFCV_BTN_*` (`CLASSNN`) | placeholders. Não mapear sem nova captura de Window Spy. |
 
 ## Não validado
@@ -176,5 +176,6 @@ As fases acima foram validadas contra o MV2000i real.
 Já aplicado em `RP_AbrirTelaTISS` (`scripts/remessa_protocolo.ahk`). Antes enviava `!lt{Enter}`.
 
 **Continua sem validação:** o **renomeamento** das `RP_*` para `MV_*` ao subir para
-`scripts/mv_session.ahk`. A renomeação é mecânica e não muda valor de coordenada, mas acontece em
-um fluxo que funciona; rode uma execução real depois da extração.
+`scripts/mv_session.ahk`. A extração foi feita (ver o quadro no `README.md`): a renomeação é
+mecânica e não muda nenhum valor de coordenada, mas acontece em um fluxo que funciona. **Rode uma
+execução real do workflow 01 para confirmar que a extração não regrediu nada.**

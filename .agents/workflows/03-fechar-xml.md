@@ -1,6 +1,6 @@
 # 03 — Fechar e Gerar XML
 
-Script: `scripts/fechar_xml.ahk` — **stub**, valida parâmetros e aborta  |  Registro: `gScripts` id `fechar_xml`
+Script: `scripts/fechar_xml.ahk` — **implementado, não validado no MV2000i**  |  Registro: `gScripts` id `fechar_xml`
 
 > Base: `Fluxos/Teste_corrigido.ahk` (594 l.). A versão de 1 remessa `Fluxos/OLD.ahk` (309 l.) está
 > superada. As fases de fechamento e XML são as mesmas do
@@ -32,15 +32,15 @@ fases são **sempre** executadas. Para fechar sem gerar, use o
 
 ## Constantes
 
-Idênticas às do workflow 01 — `DATAS_*` e `XML_*` em `scripts/mv_session.ahk`. Não duplicar
-aqui nem no script; o bloco de coordenadas é único.
+Idênticas às do workflow 01 — hoje chamam `MV_DATAS_*` e `MV_XML_*` em `scripts/mv_session.ahk`.
+Não duplicar aqui nem no script; o bloco de coordenadas é único.
 
 ```ahk
-; Spy em Fluxos/Fluxo_FecharRemessa: tela "Cadastro: Faturas e Remessas"
-DATAS_CAMPO_ENTREGA    := "Edit1"  ; 146, 101
-DATAS_CAMPO_VENCIMENTO := "Edit1"  ; 244, 227
-DATAS_CHECKBOX         := "Button3"; 541, 242
-DATAS_BTN_CONFIRMAR    := "Button10"; 30, 426
+; Tela "Cadastro: Faturas e Remessas". Coordenadas Client vindas de Window Spy.
+MV_DATAS_CAMPO_ENTREGA    := "Edit1"    ; 146, 101
+MV_DATAS_CAMPO_VENCIMENTO := "Edit1"    ; 244, 227
+MV_DATAS_CHECKBOX         := "Button3"  ; 541, 242
+MV_DATAS_BTN_CONFIRMAR    := "Button10" ; 30, 426
 ```
 
 ## Fases
@@ -49,7 +49,7 @@ DATAS_BTN_CONFIRMAR    := "Button10"; 30, 426
 
 A partir do menu principal do FFCV, `MV_EnsureFFCV` e abrir **instância nova** da Manutenção de
 Remessa (`{Alt down}lm{Alt up}{Enter}`), depois clicar `FFCV_BTN_ABRIR_DATAS`
-(`Button6`, 464, 458) e esperar `WIN_FFCV_DATAS`.
+(`Button6`, 464, 458) e esperar `MV_WIN_FFCV_DATAS`.
 
 > O original (`Teste_corrigido.ahk` L138) imprimia um relatório **antes** de abrir a entrega,
 > pelo `Button9` "Relatório Atend.". **Decisão: não incluir.** O próprio original avisa em L136 que
@@ -65,14 +65,14 @@ Idêntica à Fase 3 do workflow 01, com duas diferenças:
 
 Preencher entrega/vencimento por teclado, na ordem validada, **sem Ctrl+A**: clicar em Data de
 Entrega → `{+Tab}` (confere o nº) → `{Tab}` → `SendText dataEntrega` → `{Enter}` →
-`SendText dataVenc`. Marcar o checkbox, `DATAS_BTN_CONFIRMAR`, responder **Não** ao modal de
+`SendText dataVenc`. Marcar o checkbox, `MV_DATAS_BTN_CONFIRMAR`, responder **Não** ao modal de
 confirmação, `{Enter}` na capa de impressão, e sair com `MV_ENTREGA_SAIR_ATALHO`.
 
 ### Fase 3 — Gerar o XML
 
 Idêntica à Fase 4 do workflow 01: `MV_TISS_ATALHO` → campo remessa → `{F8}` →
-`MV_WaitXmlQueryReady` → `XML_BTN_FATURAMENTO` → caminho `<gWorkDir>\XML\<remessa>.xml` →
-`XML_FORM_BTN_SALVAR` → modais → `XML_FORM_BTN_VOLTAR` → `{Esc}`.
+`MV_WaitOracleSettled` → `MV_XML_BTN_FATURAMENTO` → caminho `<gWorkDir>\XML\<remessa>.xml` →
+`MV_XML_FORM_BTN_SALVAR` → modais → `MV_XML_FORM_BTN_VOLTAR` → `{Esc}`.
 
 **Antes de gerar**, checar se o arquivo já existe. Se existir, **pular esta remessa** e logar
 `XML já existe, não sobrescrito`. É a mesma política do modal de substituição, que já responde
@@ -106,10 +106,23 @@ menu, então **não** use "a janela sumiu" como prova isolada de que a entrega t
 |------|----------|
 | `MV_ENTREGA_SAIR_ATALHO` | `^q` preenchido, mas **não validado** contra o MV. `Esc` foi descartado por não sair. |
 | `MV_XML_BTN_SAIR_TELA` | vazio. A saída usa `{Esc}`. Atalho correto nunca descoberto. |
+| Saída da Manutenção de Remessa | **não mapeada em lugar nenhum do projeto.** Ao voltar ao menu o Forms pode reabrir a tela; se o `finally` não conseguir sair, o operador precisa fechar a tela à mão antes da próxima execução. Não há constante para ela. |
+| Referência OCR de "remessa já fechada" | não existe em `lib/FFCV_ErrorReferences.json`. Ver "Não validado" abaixo. |
 
 ## Não validado
 
-**Nada deste spec foi executado.** O `scripts/fechar_xml.ahk` atual é stub. Todos os passos vêm de
-`Fluxos/Teste_corrigido.ahk`, que rodava como script autônomo com GUI e `ToolTip` próprios. No
-Praxis não existe `ToolTip`: o progresso vai por `Notify`/`Progress`/`Done`. A sequência das fases
-foi validada no script original, mas **não** dentro do app.
+**Nada deste spec foi executado.** `scripts/fechar_xml.ahk` está implementado, mas nunca rodou
+contra o MV2000i real. Todos os passos vêm de `Fluxos/Teste_corrigido.ahk`, que rodava como script
+autônomo com GUI e `ToolTip` próprios. No Praxis não existe `ToolTip`: o progresso vai por
+`Notify`/`Progress`/`Done`. A sequência das fases foi validada no script original, mas **não**
+dentro do app.
+
+Não validados: `MV_ENTREGA_SAIR_ATALHO`, a sequência de teclado para preencher as datas, todas as
+coordenadas `MV_DATAS_*` e `MV_XML_*`, e o `MV_TISS_ATALHO` (cujo valor veio do operador).
+
+Um desvio consciente do spec: **"remessa já fechada" não é detectável**. O
+`lib/FFCV_ErrorReferences.json` só tem 5 referências OCR (`conta_ja_digitada`, `conta_aberta`,
+`conta_em_remessa`, `agrupamento_diferente`, `conta_tipo_diferente`) e nenhuma para esse texto.
+Hoje qualquer modal não reconhecido nesse ponto vira **pendência** e a execução segue para a
+próxima remessa — o que é mais permissivo que o ideal, porque uma falha real de digitação também
+passa. Adicionar a referência canônica ao JSON é o que fecha essa lacuna.

@@ -35,8 +35,9 @@ powershell -ExecutionPolicy Bypass -File .\tools\build-praxis.ps1 -Version 1.0.0
 - `main.ahk` é o entrypoint: GUI, WebView2, registro de scripts (`gScripts`), dispatcher `RunScript`, e o manifesto de integridade. Todo o app é um único binário compilado — não existe runtime de módulo.
 - `#Include` é textual e transitivo. Ordem real: `main.ahk` → `scripts/*.ahk` → `scripts/mv_session.ahk` + `lib/FFCV_ErrorTemplates.ahk` → `lib/WebView2.ahk` → `lib/ComVar.ahk`/`Promise.ahk`.
 - `scripts/mv_session.ahk` concentra o contrato de janela do MV2000i (títulos, `ifrun60.EXE`, `MV_Poll`, `MV_WaitWindowStable`, `MV_FindControlByClientPoint`). Qualquer fluxo novo deve reusar essas funções, não criar paralelas.
-- `scripts/remessa_protocolo.ahk` é o único fluxo implementado (~1700 linhas, fases MOV DOC → FFCV → datas → XML). `scripts/protocolar.ahk` e `scripts/fechar_xml.ahk` são stubs que validam parâmetros e abortam.
-- `scripts/mv_session.ahk`, `protocolar.ahk` e `fechar_xml.ahk` dependem de globais de `main.ahk` (`gRunning`, `SendToUI`). Não rodam standalone.
+- `scripts/remessa_protocolo.ahk` é o fluxo validado no MV (fases MOV DOC → FFCV → datas → XML). `scripts/protocolar.ahk` (`PR_*`) e `scripts/fechar_xml.ahk` (`FX_*`) **também estão implementados**, mas nunca foram rodados contra o MV2000i — não os trate como validados.
+- **Os três fluxos são isolados por prefixo e não se chamam.** `protocolar.ahk` não chama `RP_*` nem `FX_*`; `fechar_xml.ahk` não chama `RP_*` nem `PR_*`. Como `#Include` é textual e de escopo global, um helper compartilhado novo sobe para `mv_session.ahk` com prefixo `MV_` — não promova um helper de um fluxo só para o outro usar.
+- `scripts/mv_session.ahk`, `protocolar.ahk` e `fechar_xml.ahk` dependem de globais de `main.ahk` (`gRunning`, `gWorkDir`, `SendToUI`). Não rodam standalone.
 - UI: `ui/index.html` é arquivo único e completo. Contrato de mensagens: JS→AHK `{action: ready|run_script|stop_script|exit}`; AHK→JS `{type: app_ready|status|log|progress|done|error}`.
 - `lib/FFCV_ErrorTemplates.ahk` classifica modais de erro do FFCV por OCR do Windows (`tools/ocr-probe.ps1`) contra textos canônicos em `lib/FFCV_ErrorReferences.json`. `WinGetText`/Window Spy não expõem a mensagem desses modais — não tente substituir o OCR por leitura de controle.
 
@@ -48,7 +49,10 @@ powershell -ExecutionPolicy Bypass -File .\tools\build-praxis.ps1 -Version 1.0.0
 - `images/` e `test_macros/` são citados em comentários e no README mas **não existem** neste checkout. `Fluxos/` existe localmente (screenshots, CSVs, `OLD.ahk`, `Teste_corrigido.ahk`) e é ignorado pelo Git — é material de referência, não código.
 - `config.ini` é gitignored e ausente: o app cai no default `%USERPROFILE%\Documents\Praxis`. XMLs de remessa vão para `<WorkDir>\XML\`.
 - O app **não abre nem autentica** MOV DOC/FFCV. `MV_EnsureMovDoc`/`MV_EnsureFFCV` só abortam com mensagem pedindo abertura manual. O botão Parar só limpa `gRunning`; não cancela um fluxo já em execução no MV.
-- `RP_ENTREGA_SAIR_ATALHO` e `XML_BTN_SAIR_TELA` estão mapeados por atalho/teclado com valores pendentes. Não "conserte" por adivinhação de coordenada de tela.
+- `MV_ENTREGA_SAIR_ATALHO` (`^q`) está preenchido mas **nunca validado**; `MV_XML_BTN_SAIR_TELA` está vazio e a saída usa `{Esc}`. Não "conserte" nenhum dos dois por adivinhação.
+- `{Down 121}` em `protocolar.ahk` (`PR_RELATORIO_DOWN_N`) é **posicional** e nunca validado: depende da ordenação do relatório na estação do hospital. Se mudar lá, o fluxo gera a planilha errada sem erro visível.
+- `lib/FFCV_ErrorReferences.json` não tem referência para **"remessa já fechada"**. Por isso `fechar_xml.ahk` trata qualquer modal não reconhecido nesse ponto como pendência e segue — mais permissivo que o ideal. Adicionar a referência canônica é o que fecha a lacuna.
+- As coordenadas nos comentários de `mv_session.ahk` apontam para `.agents/workflows/01-remessa-protocolo.md` como fonte versionada. As capturas originais estão em `Fluxos/`, que é gitignored e não existe em todo checkout — quem for reconferir contra o MV precisa do MV real.
 - O staging de distribuição não pode conter `.ahk`, `.ps1`, `.iss`, `.html` nem `.json`; o build falha se vazar. `config.ini`, logs, XMLs e `.pfx` também não entram no pacote.
 - Todo arquivo de primeira parte (`.ahk` e `.ps1`) começa com o cabeçalho proprietário de 4 linhas. Mantenha ao criar arquivos. `lib/WebView2.ahk`, `JSON.ahk`, `Promise.ahk` e `ComVar.ahk` são libs externas (thqby) — não edite.
 
@@ -58,7 +62,7 @@ powershell -ExecutionPolicy Bypass -File .\tools\build-praxis.ps1 -Version 1.0.0
 - `EditN` não é contrato: o Forms renumera conforme estado da tela. Localize por ClassNN + ponto Client, ou por prefixo de classe (`ui60Drawn`).
 - Coordenadas são Client e vieram de Window Spy/captura. Não introduzir coordenadas de tela.
 - Leia campo de grid por `Home`+`Shift+End`+`Ctrl+C` com validação semântica (`RP_GridValueValid`), não por `ControlGetText`.
-- Use `MV_Poll`/`RP_WaitOracleSettled` em vez de `Sleep` fixo quando esperar janela, modal ou cursor estabilizar.
+- Use `MV_Poll`/`MV_WaitOracleSettled` em vez de `Sleep` fixo quando esperar janela, modal ou cursor estabilizar.
 - Popups "Informações da Conta" e afins não têm título próprio: são detectados pelo sentinela `ui60Drawn W323` dentro da janela FFCV.
 - Ao documentar uma constante nova, registre de qual tela/screenshot ela veio (o padrão é uma linha `; Spy em ...` acima do bloco).
 

@@ -1,6 +1,6 @@
 # 02 — Protocolar
 
-Script: `scripts/protocolar.ahk` — **stub**, valida parâmetros e aborta  |  Registro: `gScripts` id `protocolar`
+Script: `scripts/protocolar.ahk` — **implementado, não validado no MV2000i**  |  Registro: `gScripts` id `protocolar`
 
 > Base: `Fluxos/protocolar.ahk` (2.200 l., 2026-06-22). A versão anterior
 > `Fluxos/Protocolar_recuperado.ahk` diverge em `CorrigirSetorDaContaEBaixar` (inverte os setores);
@@ -21,8 +21,9 @@ pelo MOV DOC, dando baixa nos protocolos pendentes que o MV recusar.
 | `tipo` | Tipo | select | sim | `Ambulatorial` \| `Hospitalar`. **Muda a sequência de teclas** da tela de envio |
 | `imprimir_salvar_envio` | Imprimir/Salvar Envio | select | sim | `Sim` \| `Não`. Decide entre `Alt+1`+Imprimir ou só excluir o registro em branco |
 
-`tipo` e `imprimir_salvar_envio` existem no original e ainda **não** estão em `gScripts`. Ao
-adicioná-los, editar **os dois** lugares: `main.ahk` e `devSim()` em `ui/index.html`.
+`tipo` e `imprimir_salvar_envio` estão registrados em `gScripts` (`main.ahk`) **e** em `devSim()`
+(`ui/index.html`), como a armadilha de duplicação do projeto exige. Alterar id, label, `tipo`,
+`obrigatorio` ou `default` de um parâmetro exige editar os dois lugares.
 
 ## Pré-condições
 
@@ -169,13 +170,23 @@ Correção de OCR: se o setor lido tem **o mesmo tamanho** do `setor_envio` conf
 |------|----------|
 | `{Down 121}` | posicional, não validado. Registrar a ordenação real do relatório |
 | `FFCV_BTN_GERAR_ARQUIVO` client `548, 91` | vem do original; `TBitBtn2` é do `EXECUTASQL.exe`, não do `ifrun60.EXE` |
-| Cadeia de fallback do popup de remessa | o original tem 4 fallbacks porque `EXECUTASQL.exe` é instável. É o ponto mais frágil do fluxo |
-| `params.tipo` e `params.imprimir_salvar_envio` | não existem em `gScripts` ainda |
+| Cadeia de fallback do popup de remessa | o original tem 5 fallbacks porque `EXECUTASQL.exe` é instável. As 5 estratégias foram preservadas em `PR_EsperarPopupRemessa`, mas **nenhuma foi validada**. É o ponto mais frágil do fluxo |
+| `params.tipo` e `params.imprimir_salvar_envio` | **resolvido** — registrados em `gScripts` (`main.ahk`) e em `devSim()` (`ui/index.html`) |
 
 ## Não validado
 
-**Nada deste spec foi executado.** O `scripts/protocolar.ahk` atual é stub e aborta antes de
-qualquer ação. Todos os passos acima vêm de `Fluxos/protocolar.ahk`, que rodava como script
+**Nada deste spec foi executado.** `scripts/protocolar.ahk` está implementado, mas nunca rodou
+contra o MV2000i real. Todos os passos acima vêm de `Fluxos/protocolar.ahk`, que rodava como script
 autônomo com GUI própria — não dentro do Praxis, sem WebView2 e sem `gRunning`. Mover para o
-dispatcher do Praxis muda o contexto de teclado e de timing. **Só considere este fluxo validado
-depois de uma execução real no MV2000i.**
+dispatcher do Praxis muda o contexto de teclado e de timing.
+
+Não validados, mesmo com o build e o `--integrity-check` passando: todos os atalhos de menu
+(`!e`, `!1`, `mpe`, `mpb`, `Alt+1`), `{Down 121}`, `FFCV_BTN_GERAR_ARQUIVO` em (548, 91), o campo
+de protocolo em (60, 115), o diálogo *Salvar como* e o OCR do popup do MV.
+
+O que **foi** validado, por não depender do MV: o parser CSV e a classificação do popup foram
+exercitados com um script temporário (49 checagens, 0 falhas) contra o cabeçalho real do
+`Fluxos/ffcv/1.CSV` e contra as mensagens de exemplo deste spec, incluindo a correção `336`→`356`
+e seus casos negativos.
+
+**Só considere este fluxo validado depois de uma execução real no MV2000i.**
