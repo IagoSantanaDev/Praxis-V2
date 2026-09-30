@@ -220,14 +220,22 @@ FX_PreencherDatasPorTeclado(remessaParam, dataEntrega, dataVencimento) {
 
     Send("{Tab}")
     Sleep MV_KEY_SETTLE_MS
-    SendText dataEntrega
+    SendText MV_NormalizarDataBr(dataEntrega)
     Sleep MV_KEY_SETTLE_MS
     Send("{Enter}")
     Sleep MV_KEY_SETTLE_MS
-    SendText dataVencimento
+    SendText MV_NormalizarDataBr(dataVencimento)
     Sleep MV_KEY_SETTLE_MS
 
-    Notify("Datas enviadas por teclado: entrega " dataEntrega ", vencimento " dataVencimento ".")
+    ; Conferência de ida e volta: a tela é lida depois do preenchimento para
+    ; confirmar que o FFCV recebeu dd/mm/aaaa. Sem isto, um formato divergente
+    ; só apareceria como recusa do MV, sem dizer qual campo falhou.
+    Notify("Conferência de datas na tela — entrega: "
+        MV_CompararDataTela(MV_WIN_FFCV_DATAS, MV_DATAS_CAMPO_ENTREGA_X, MV_DATAS_CAMPO_ENTREGA_Y, dataEntrega)
+        "; vencimento: "
+        MV_CompararDataTela(MV_WIN_FFCV_DATAS, MV_DATAS_CAMPO_VENCIMENTO_X, MV_DATAS_CAMPO_VENCIMENTO_Y, dataVencimento))
+
+    Notify("Datas enviadas por teclado: entrega " MV_NormalizarDataBr(dataEntrega) ", vencimento " MV_NormalizarDataBr(dataVencimento) ".")
     return Map("ok", true, "erro", "", "remessaTela", remessaTela)
 }
 

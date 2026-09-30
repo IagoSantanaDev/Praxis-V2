@@ -1240,13 +1240,21 @@ RP_PreencherDatasEntregaPorTeclado(dataEntrega, dataVenc) {
 
     Send("{Tab}")
     Sleep RP_KEY_SETTLE_MS
-    SendText dataEntrega
+    SendText MV_NormalizarDataBr(dataEntrega)
     Sleep RP_KEY_SETTLE_MS
     Send("{Enter}")
     Sleep RP_KEY_SETTLE_MS
-    SendText dataVenc
+    SendText MV_NormalizarDataBr(dataVenc)
     Sleep RP_KEY_SETTLE_MS
-    Notify("Datas enviadas por teclado. Remessa " numRemessa ", entrega " dataEntrega ", vencimento " dataVenc ".")
+
+    ; Conferência de ida e volta, como no Fechar&XML: se o FFCV recusar o
+    ; formato, o log precisa dizer qual campo divergiu.
+    Notify("Conferência de datas na tela — entrega: "
+        MV_CompararDataTela(WIN_FFCV_DATAS, MV_DATAS_CAMPO_ENTREGA_X, MV_DATAS_CAMPO_ENTREGA_Y, dataEntrega)
+        "; vencimento: "
+        MV_CompararDataTela(WIN_FFCV_DATAS, MV_DATAS_CAMPO_VENCIMENTO_X, MV_DATAS_CAMPO_VENCIMENTO_Y, dataVenc))
+
+    Notify("Datas enviadas por teclado. Remessa " numRemessa ", entrega " MV_NormalizarDataBr(dataEntrega) ", vencimento " MV_NormalizarDataBr(dataVenc) ".")
 
     return Map("ok", true, "erro", "", "remessa", numRemessa)
 }

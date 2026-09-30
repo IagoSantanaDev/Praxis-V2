@@ -113,6 +113,16 @@ MV_FIELD_FOCUS_SETTLE_MS := 100
 MV_FIELD_CLEAR_SETTLE_MS := 100
 MV_KEY_SETTLE_MS         := 100
 
+; ── Formato de data dos campos do Oracle Forms ────────────────
+; O FFCV exige dd/mm/aaaa e RECUSA yyyy-mm-dd (confirmado pelo operador).
+; A UI entrega yyyy-mm-dd porque <input type="date"> segue a spec HTML,
+; independente do locale exibido. A conversão acontece aqui, na fronteira
+; com o MV, e não no JS — `gScripts` (main.ahk) e `devSim()` (ui/index.html)
+; descrevem os mesmos scripts em duplicado, e normalizar no AHK cobre os dois
+; caminhos com uma função. docs/analise-causa-raiz/03-fechar-xml-data-formato-americano.md
+MV_DATA_FORMATO_FFCV := "dd/MM/yyyy"
+MV_DATA_REGEX_ISO   := "^\d{4}-\d{2}-\d{2}$"
+
 ; ── Esperas da fase de fechamento/XML ─────────────────────────
 ; Esta fase dispara processamentos pesados no Oracle Forms. Evitar avançar apenas
 ; porque o clique foi aceito; aguardar janela/modal/cursor estabilizarem.
@@ -672,4 +682,33 @@ MV_ClickBySpec(winTitle, classNN, x, y) {
     } catch {
         return false
     }
+}
+
+; ════════════════════════════════════════════════════════════════
+;  DATA
+; ════════════════════════════════════════════════════════════════
+
+; Converte a data que chega da UI para o formato que o FFCV aceita.
+; Aceita yyyy-mm-dd (o que <input type="date"> entrega) e repassa inalterado
+; qualquer outro valor — inclusive dd/mm/aaaa, que pode vir de config.ini ou
+; de outro chamador. Não valida: um valor irreconhecível precisa chegar ao FFCV
+; para o operador ver a recusa dele, não para o macro adivinhar o que era.
+MV_NormalizarDataBr(valor) {
+    valor := Trim(valor)
+    if !RegExMatch(valor, MV_DATA_REGEX_ISO, &m)
+        return valor
+    return FormatTime(RegExReplace(m[0], "\D") "000000", MV_DATA_FORMATO_FFCV)
+}
+
+; Lê de volta o texto de um campo de data já preenchido na tela do MV e compara
+; com o valor que foi enviado. É o que impede um formato divergente de passar
+; em silêncio: o operador vê a divergência no log, no momento do preenchimento.
+; Não recebe classNN porque MV_ReadEditAtPoint já resolve por prefixo "Edit".
+MV_CompararDataTela(winTitle, clientX, clientY, valorEnviado, tolerance := 14) {
+    naTela := MV_ReadEditAtPoint(winTitle, clientX, clientY, "", tolerance)
+    if (naTela = "")
+        return "nao lida"
+    if (MV_NormalizarDataBr(naTela) = MV_NormalizarDataBr(valorEnviado))
+        return "ok"
+    return "divergente: tela=" naTela " enviado=" valorEnviado
 }
