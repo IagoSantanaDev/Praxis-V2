@@ -86,8 +86,8 @@ POPUP_BTN_OK       := "Button1"  ; modal de aviso/erro usa o primeiro Button1
 
 ; ── Controles tela de datas / XML ─────────────────────────────
 ; Constantes promovidas para o contrato compartilhado em mv_session.ahk
-; (prefixo MV_DATAS_* e MV_XML_*), junto com os atalhos MV_ENTREGA_SAIR_ATALHO
-; e MV_XML_BTN_SAIR_TELA. As referências abaixo usam o prefixo MV_ direto.
+; (prefixo MV_DATAS_* e MV_XML_*), junto com os atalhos MV_SAIR_TELA_ATALHO
+; e MV_SAIR_TELA_ATALHO. As referências abaixo usam o prefixo MV_ direto.
 
 ; ── Fragmentos/classificação de erros no popup de envio ───────
 ; Modais Oracle Forms não expõem a mensagem pelo Window Spy/WinGetText de forma confiável.
@@ -186,62 +186,67 @@ RunRemessaProtocolo(params) {
 
     Progress(50)
 
-    stageStart := A_TickCount
-    if !CarregarConvenioFFCV(convenioNum)
-        return RP_Abort("Não consegui carregar o convênio " convenioNum " no FFCV.")
-
-    PosicionarAreaRemessas()
-
-    if (numRemessa != "") {
-        if !SelecionarRemessaExistente(numRemessa)
-            return RP_Abort("Remessa " numRemessa " não encontrada.")
-    } else {
-        if !CriarNovaRemessa(tipoConta)
-            return RP_Abort("Erro ao criar nova remessa.")
-    }
-    RP_RecordTiming(timings, "Carregar convênio e posicionar remessa", stageStart, "convênio " convenioNum)
-
-    Progress(60)
-    stageStart := A_TickCount
-    if !InserirContasNaRemessa(protocolContas, tipoConta, erros)
-        return false
-    RP_RecordTiming(timings, "Inserir contas FFCV", stageStart, totalContasFFCV " conta(s)")
-
-    Progress(87)
-
-    if temDatas {
+    try {
         stageStart := A_TickCount
-        Notify("Preenchendo datas...")
-        result := FinalizarComDatas(dataEntrega, dataVenc)
-        if !result["ok"]
-            return RP_Abort(result["erro"])
-        RP_RecordTiming(timings, "Fechar remessa e preencher datas", stageStart, "remessa " result["remessa"])
-        Progress(94)
+        if !CarregarConvenioFFCV(convenioNum)
+            return RP_Abort("Não consegui carregar o convênio " convenioNum " no FFCV.")
+
+        PosicionarAreaRemessas()
+
+        if (numRemessa != "") {
+            if !SelecionarRemessaExistente(numRemessa)
+                return RP_Abort("Remessa " numRemessa " não encontrada.")
+        } else {
+            if !CriarNovaRemessa(tipoConta)
+                return RP_Abort("Erro ao criar nova remessa.")
+        }
+        RP_RecordTiming(timings, "Carregar convênio e posicionar remessa", stageStart, "convênio " convenioNum)
+
+        Progress(60)
         stageStart := A_TickCount
-        Notify("Gerando XML...")
-        if !GerarXML(result["remessa"])
+        if !InserirContasNaRemessa(protocolContas, tipoConta, erros)
             return false
-        RP_RecordTiming(timings, "Gerar XML", stageStart)
-    } else {
-        stageStart := A_TickCount
-        FinalizarSemDatas()
-        RP_RecordTiming(timings, "Finalização sem datas", stageStart)
-    }
+        RP_RecordTiming(timings, "Inserir contas FFCV", stageStart, totalContasFFCV " conta(s)")
 
-    Progress(100)
-    RP_RecordTiming(timings, "Total do fluxo", totalStart, protocolos.Length " protocolo(s), " totalContasFFCV " conta(s)")
-    timingReport := RP_FormatTimingReport(timings)
-    gRunning := false
+        Progress(87)
 
-    if (erros.Length > 0) {
-        linhas := "Remessa concluída com sucesso!`n`n" timingReport
-        linhas .= "`nConcluído com " erros.Length " pendência(s):`n"
-        linhas .= "PROTOCOLO | CONTA | ERRO`n"
-        for _, e in erros
-            linhas .= "  [[red]]" e["protocolo"] " | " e["conta"] " | " e["descricao"] "[[/red]]`n"
-        Done(linhas)
-    } else {
-        Done("Remessa concluída com sucesso!`n`n" timingReport)
+        if temDatas {
+            stageStart := A_TickCount
+            Notify("Preenchendo datas...")
+            result := FinalizarComDatas(dataEntrega, dataVenc)
+            if !result["ok"]
+                return RP_Abort(result["erro"])
+            RP_RecordTiming(timings, "Fechar remessa e preencher datas", stageStart, "remessa " result["remessa"])
+            Progress(94)
+            stageStart := A_TickCount
+            Notify("Gerando XML...")
+            if !GerarXML(result["remessa"])
+                return false
+            RP_RecordTiming(timings, "Gerar XML", stageStart)
+        } else {
+            stageStart := A_TickCount
+            FinalizarSemDatas()
+            RP_RecordTiming(timings, "Finalização sem datas", stageStart)
+        }
+
+        Progress(100)
+        RP_RecordTiming(timings, "Total do fluxo", totalStart, protocolos.Length " protocolo(s), " totalContasFFCV " conta(s)")
+        timingReport := RP_FormatTimingReport(timings)
+        gRunning := false
+
+        if (erros.Length > 0) {
+            linhas := "Remessa concluída com sucesso!`n`n" timingReport
+            linhas .= "`nConcluído com " erros.Length " pendência(s):`n"
+            linhas .= "PROTOCOLO | CONTA | ERRO`n"
+            for _, e in erros
+                linhas .= "  [[red]]" e["protocolo"] " | " e["conta"] " | " e["descricao"] "[[/red]]`n"
+            Done(linhas)
+        } else {
+            Done("Remessa concluída com sucesso!`n`n" timingReport)
+        }
+    } finally {
+        ; O finally roda em qualquer saída, inclusive nos RP_Abort do meio do fluxo.
+        RP_RecuperarTelas()
     }
 }
 
@@ -1204,18 +1209,58 @@ FinalizarComDatas(dataEntrega, dataVenc) {
     return Map("ok", true, "remessa", Trim(numRemessa))
 }
 
-RP_SairTelaEntrega() {
-    if (Trim(MV_ENTREGA_SAIR_ATALHO) = "") {
-        Notify("Atalho para sair da tela Entrega de Remessas (MV_ENTREGA_SAIR_ATALHO) está vazio.")
-        return false
-    }
+RP_RecuperarTelas() {
+    ; Executado ao fim do fluxo, inclusive em caso de erro: devolve o MV a um estado
+    ; previsível e fecha a última tela. Mesmo desenho de PR_RecuperarTelas e
+    ; FX_RecuperarTelas. NUNCA usar WinClose no Oracle Forms — perde o estado.
+    try {
+        if (MV_ActiveModalTitle() != "") {
+            ; O popup do MV NÃO é fechado às cegas: a mensagem precisa ser lida, e
+            ; MV_FecharUltimaTela também não fecha enquanto houver popup aberto.
+            Notify("Recuperação: há um popup do MV aberto. Ele NÃO foi fechado automaticamente —"
+                " a mensagem precisa ser lida. Resolva na tela antes de rodar de novo.")
+            return
+        }
 
+        if WinExist(WIN_CAPA_REMESSA) {
+            Notify("Recuperação: a tela de impressão da capa ficou aberta.")
+        }
+
+        if WinExist(MV_WIN_XML_PATH_FORM) {
+            Notify("Recuperação: voltando da tela de caminho do XML.")
+            MV_ClickBySpec(MV_WIN_XML_PATH_FORM, MV_XML_FORM_BTN_VOLTAR, MV_XML_FORM_BTN_VOLTAR_X, MV_XML_FORM_BTN_VOLTAR_Y)
+            Sleep MV_DELAY_INPUT
+        }
+
+        if WinExist(MV_WIN_XML_TISS) {
+            Notify("Recuperação: saída da tela XML/TISS por " MV_SAIR_TELA_ATALHO ".")
+            Send MV_SAIR_TELA_ATALHO
+            Sleep MV_DELAY_INPUT
+        }
+
+        if WinExist(WIN_FFCV_DATAS) {
+            if MV_EnsureWindowActive(WIN_FFCV_DATAS) {
+                Notify("Recuperação: saída da tela de entrega por " MV_SAIR_TELA_ATALHO ".")
+                Send MV_SAIR_TELA_ATALHO
+                MV_Poll(() => !WinExist(WIN_FFCV_DATAS), MV_TIMEOUT_ACOE)
+            } else {
+                Notify("Recuperação: a tela de entrega pode ter ficado aberta.")
+            }
+        }
+
+        MV_FecharUltimaTela(MV_WIN_FFCV_ANY, "FFCV")
+    } catch as e {
+        Notify("Aviso na recuperação de telas: " e.Message)
+    }
+}
+
+RP_SairTelaEntrega() {
     if !MV_EnsureWindowActive(WIN_FFCV_DATAS) {
         Notify("Não consegui ativar a tela Entrega de Remessas para enviar o atalho de saída.")
         return false
     }
 
-    Send MV_ENTREGA_SAIR_ATALHO
+    Send MV_SAIR_TELA_ATALHO
     return MV_Poll(() => !WinExist(WIN_FFCV_DATAS), MV_TIMEOUT_ACOE)
 }
 
@@ -1435,7 +1480,7 @@ RP_ClickNaoModal() {
 }
 
 RP_SairTelaAtual() {
-    Send MV_XML_BTN_SAIR_TELA
+    Send MV_SAIR_TELA_ATALHO
     Sleep MV_DELAY_INPUT
     return true
 }
