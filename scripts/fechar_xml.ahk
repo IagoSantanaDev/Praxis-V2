@@ -27,12 +27,13 @@
 ; Nada de Gui, MsgBox, ToolTip ou hotkey.
 
 ; ── Constantes locais ───────────────────────────────────────────
-; FFCV_BTN_ABRIR_DATAS vive no remessa_protocolo.ahk (prefixo RP_). Replicado aqui
-; com o MESMO ClassNN e o MESMO ponto Client para manter os fluxos independentes.
-; PENDENTE: não revalidado neste fluxo — só o workflow 01 rodou contra o MV2000i.
-FX_BTN_ABRIR_DATAS   := "Button6"  ; 5 - Entregar Rem.
-FX_BTN_ABRIR_DATAS_X := 464
-FX_BTN_ABRIR_DATAS_Y := 458
+; A navegação para a tela de entrega e a impressão do relatório de
+; atendimentos usam o contrato compartilhado de mv_session.ahk
+; (MV_ENTREGA_REMESSAS_ALTALHO, MV_WIN_FFCV_BTN_RELATORIO,
+; MV_WIN_CAPA_REMESSA_BTN_IMPRIMIR), alinhados ao fluxo validado.
+; O antigo FX_BTN_ABRIR_DATAS ("5 - Entregar Rem.", Button6 em 464,458) foi
+; removido junto com o hop por Manutenção de Remessa: essa tela não é mais
+; usada por este módulo.
 
 ; Espera máxima do modal de confirmação/recusa logo após confirmar a entrega.
 FX_MODAL_CONFIRMACAO_TIMEOUT_SEG := 10
@@ -124,11 +125,8 @@ RunFecharXML(params) {
 }
 
 FX_ProcessarRemessa(remessa, dataEntrega, dataVencimento) {
-    ; Fase 1 — abrir a tela de entrega a partir de uma instância nova da Manutenção de Remessa.
-    if !FX_AbrirManutencaoRemessa()
-        return FX_EstadoFatal("Não consegui abrir a Manutenção de Remessa no FFCV para a remessa " remessa ".")
-
-    ; Fase 2 — fechar a remessa.
+    ; Fase 1 — abrir a tela de entrega direto do menu do FFCV (Alt+L+E), com a
+    ; impressão do relatório de atendimentos antes, quando o Button9 existe.
     if !FX_AbrirTelaEntrega()
         return FX_EstadoFatal("A tela de entrega da remessa " remessa " não abriu.")
 
@@ -157,35 +155,67 @@ FX_EstadoFatal(erro) => Map("estado", "fatal", "xml", "", "erro", erro)
 ;  FASE 1 — ABRIR A TELA DE ENTREGA
 ; ════════════════════════════════════════════════════════════════
 
-FX_AbrirManutencaoRemessa() {
-    ; Sempre instância nova. O original imprimia "Relatório Atend." (Button9) antes de
-    ; abrir a entrega; o spec 03 decidiu não incluir — o botão não existe em todas as telas.
-    MV_ActivateModule(MV_WIN_FFCV_ANY)
-    if !MV_WaitWindowStable(MV_WIN_FFCV_ANY, MV_MODULE_STABLE_MS, MV_TIMEOUT_LOAD)
-        return false
-
-    ; Atalho validado no macro 03: Lançamentos → Manutenção de Remessa.
-    Send "{Alt down}lm{Alt up}{Enter}"
-
-    if !MV_Poll(() => WinExist(MV_WIN_FFCV_REMESSA), MV_TIMEOUT_LOAD)
-        return false
-
-    return MV_WaitWindowStable(MV_WIN_FFCV_REMESSA, MV_TARGET_STABLE_MS, MV_TIMEOUT_LOAD)
-}
-
 FX_AbrirTelaEntrega() {
+    ; Alinhado ao fluxo validado (Fechar&XML.ahk:136-145): do menu do FFCV,
+    ; Lançamentos → Entrega de Remessas direto, com Alt+L+E. A versão anterior
+    ; passava por Manutenção de Remessa e clicava "5 - Entregar Rem." (Button6)
+    ; — um hop a mais que o validado não tem. Para fechar a entrega o MV não
+    ; precisa preparar remessa nenhuma, e o caminho longo só acumula uma
+    ; dependência de coordenada.
+    ;
+    ; O relatório de atendimentos (Button9) é impresso ANTES, e só se o botão
+    ; existir. O validado faz exatamente esta checagem (`:136-139`): o botão
+    ; não está em todas as telas, e a navegação para entrega não pode depender
+    ; dele. Era a objeção que motivou a remoção do relatório no spec 03, e ela
+    ; já está resolvida na referência.
     if !MV_EnsureWindowActive(MV_WIN_FFCV_ANY)
         return false
 
+    if MV_ControleExistePorClasse(MV_WIN_FFCV_ANY, MV_WIN_FFCV_BTN_RELATORIO)
+        FX_ImprimirRelatorioAtendimentos("Impressão inicial do relatório de atendimentos...")
+    else
+        Notify("Relatório de atendimentos indisponível nesta tela; seguindo para a entrega.")
+
     startedAt := A_TickCount
-    if !MV_ClickBySpec(MV_WIN_FFCV_ANY, FX_BTN_ABRIR_DATAS, FX_BTN_ABRIR_DATAS_X, FX_BTN_ABRIR_DATAS_Y)
-        return false
+    Send MV_ENTREGA_REMESSAS_ALTALHO
 
     if !MV_Poll(() => WinExist(MV_WIN_FFCV_DATAS), MV_TIMEOUT_LOAD)
         return false
 
     Notify("Tela de entrega de datas detectada em " (A_TickCount - startedAt) "ms.")
     return true
+}
+
+; Impressão do relatório de atendimentos: o relatório abre, confirma-se e
+; espera-se o "Andamento do Relatório" do RWRBE60.EXE. O botão do relatório é
+; Button2 nessa tela. Espelha Fechar&XML.ahk:220-258.
+FX_ImprimirRelatorioAtendimentos(mensagem) {
+    Notify(mensagem)
+
+    if !MV_Poll(() => WinExist(MV_WIN_CAPA_REMESSA), MV_TIMEOUT_LOAD) {
+        Notify("Aviso: a tela do relatório de atendimentos não abriu; seguindo.")
+        return false
+    }
+    if !MV_EnsureWindowActive(MV_WIN_CAPA_REMESSA) {
+        Notify("Aviso: a tela do relatório não ficou ativa; seguindo.")
+        return false
+    }
+
+    if !MV_ClickFirstControl(MV_WIN_CAPA_REMESSA, MV_WIN_CAPA_REMESSA_BTN_IMPRIMIR) {
+        Notify("Aviso: não consegui acionar Imprimir no relatório; seguindo.")
+        return false
+    }
+
+    ; O RWRBE60.EXE fecha sozinho quando a impressão acaba. `WinClose` é
+    ; permitido nesse processo e PROIBIDO no ifrun60.EXE.
+    if MV_Poll(() => WinExist(MV_WIN_ANDAMENTO), 2) {
+        while (WinExist(MV_WIN_ANDAMENTO))
+            Sleep MV_POLL_MS
+        return true
+    }
+
+    Notify("Aviso: a janela de andamento da impressão não apareceu; seguindo.")
+    return false
 }
 
 ; ════════════════════════════════════════════════════════════════

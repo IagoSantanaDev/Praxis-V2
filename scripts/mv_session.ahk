@@ -46,11 +46,30 @@ MV_WIN_FFCV_DATAS    := "Cadastro: Faturas e Remessas"
 MV_WIN_CAPA_REMESSA  := "Relatório de Atendimentos da Remessa"
 MV_WIN_XML_TISS      := "Monitoração de Faturamento - TISS"
 MV_WIN_XML_PATH_FORM := "MV2000i - Faturamento - [WIN_PRINCIPAL]"
+; Janela de progresso da impressão, no processo de relatórios (RWRBE60.EXE) —
+; e NÃO no ifrun60.EXE. Fecha sozinha quando a impressão acaba.
+MV_WIN_ANDAMENTO     := "Andamento do Relatório ahk_exe RWRBE60.EXE"
+
+; ── Controles do relatório de atendimentos ─────────────────────
+; Botão que abre o relatório a partir do menu do FFCV. NÃO existe em todas as
+; telas — por isso FX_AbrirTelaEntrega checa a prontidão antes de clicar, como
+; o fluxo validado (Fechar&XML.ahk:136-139, :222-223).
+; Sem coordenada de propósito: o validado usa só ControlClick, e coordenada aqui
+; viria de Window Spy que não existe versionado. MV_ClickFirstControl também
+; não cai no clique cego por coordenada do MV_ClickBySpec.
+MV_WIN_FFCV_BTN_RELATORIO := "Button9"
+; Botão de impressão dentro da tela do relatório. Fonte: Fechar&XML.ahk:225.
+MV_WIN_CAPA_REMESSA_BTN_IMPRIMIR := "Button2"
 
 ; ── Atalhos de teclado validados ──────────────────────────────
 ; Atalho: Lançamentos → Monitoração de Faturamento - TISS.
 ; Confirmado contra o MV2000i pelo operador. Spy em Fluxos/Teste_corrigido.ahk L314.
 MV_TISS_ATALHO := "{Alt down}lmm{Enter}{Alt up}"
+; Atalho: Lançamentos → Entrega de Remessas (Cadastro: Faturas e Remessas),
+; direto do menu do FFCV. Confirmado pelo fluxo validado em
+; Praxis_TO-DO/Fechar&XML/Fechar&XML.ahk:140 e :175, que usa exatamente este
+; atalho para abrir e para reabrir a tela entre as remessas.
+MV_ENTREGA_REMESSAS_ALTALHO := "{Alt down}l{Alt up}e"
 ; Saída de tela no MV2000i. Confirmado pelo operador: Ctrl+Q vale para TODAS as telas.
 ; No menu principal fecha o MV. Em AHK, "^q" É a notação de Ctrl+Q — não ajustar.
 ; {Esc} foi descartado: não sai da tela de Entrega de Remessas.
@@ -600,6 +619,26 @@ MV_WaitTelaSaiu(winTitle, assinaturaAntes, stableMs := 800, timeoutMs := 30000) 
 
 MV_LogSaidaTela(rotulo, detalhe) {
     try SendToUI(Map("type", "log", "message", "Saída de " rotulo ": " detalhe))
+}
+
+; O controle existe na janela? Equivalente ao AreControlsReady do fluxo
+; validado (Fechar&XML.ahk:537-546), usado para não clicar num botão que não
+; está presente na tela atual. Não clica: só responde se pode clicar.
+MV_ControleExistePorClasse(winTitle, classNN) {
+    if !WinExist(winTitle)
+        return false
+    try hwnds := WinGetControlsHwnd(winTitle)
+    catch
+        return false
+
+    for hwnd in hwnds {
+        try ctrlClass := ControlGetClassNN(hwnd)
+        catch
+            continue
+        if (ctrlClass = classNN)
+            return true
+    }
+    return false
 }
 
 MV_WaitOracleSettled(winTitle, stableMs := 800, timeoutMs := 30000) {
