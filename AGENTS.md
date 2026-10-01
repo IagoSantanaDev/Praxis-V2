@@ -106,7 +106,7 @@ Não existe test suite, linter nem CI — e o build não prova comportamento. **
 novo.** Se não foi possível validar, diga exatamente por quê em vez de afirmar que funciona.
 
 Outros builds: com instalador, `-Version 9.9.9-test`; release exige assinatura **e** árvore Git
-limpa — `-Version 1.0.0 -CertificateThumbprint <THUMBPRINT> -Release`. O toolchain (AutoHotkey v2,
+limpa — `-Version 1.2.0 -CertificateThumbprint <THUMBPRINT> -Release`. O toolchain (AutoHotkey v2,
 Ahk2Exe, ISCC, signtool) é descoberto automaticamente pelo `tools/build-praxis.ps1`; **não fixe
 caminho absoluto**.
 

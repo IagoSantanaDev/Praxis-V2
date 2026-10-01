@@ -14,17 +14,17 @@ Pré-requisitos para build completo:
 - Inno Setup 6 instalado para gerar o instalador, salvo se usar -SkipInstaller.
 
 Exemplos:
-  powershell -ExecutionPolicy Bypass -File .\tools\build-praxis.ps1 -Version 1.0.0
-  powershell -ExecutionPolicy Bypass -File .\tools\build-praxis.ps1 -Version 1.0.0 -InstallAhk2Exe
-  powershell -ExecutionPolicy Bypass -File .\tools\build-praxis.ps1 -Version 1.0.0 -SkipInstaller
-  powershell -ExecutionPolicy Bypass -File .\tools\build-praxis.ps1 -Version 1.0.0 -CertificateThumbprint <THUMBPRINT> -RequireCodeSigning
-  powershell -ExecutionPolicy Bypass -File .\tools\build-praxis.ps1 -Version 1.0.0 -CertificateThumbprint <THUMBPRINT> -Release
+  powershell -ExecutionPolicy Bypass -File .\tools\build-praxis.ps1 -Version 1.2.0
+  powershell -ExecutionPolicy Bypass -File .\tools\build-praxis.ps1 -Version 1.2.0 -InstallAhk2Exe
+  powershell -ExecutionPolicy Bypass -File .\tools\build-praxis.ps1 -Version 1.2.0 -SkipInstaller
+  powershell -ExecutionPolicy Bypass -File .\tools\build-praxis.ps1 -Version 1.2.0 -CertificateThumbprint <THUMBPRINT> -RequireCodeSigning
+  powershell -ExecutionPolicy Bypass -File .\tools\build-praxis.ps1 -Version 1.2.0 -CertificateThumbprint <THUMBPRINT> -Release
 #>
 
 [CmdletBinding()]
 param(
     [ValidatePattern('^\d+\.\d+\.\d+([-.+][A-Za-z0-9.-]+)?$')]
-    [string]$Version = '1.0.0',
+    [string]$Version = '1.2.0',
 
     [string]$Ahk2ExePath,
     [string]$AutoHotkeyBasePath,
@@ -266,7 +266,7 @@ function Convert-ToWindowsVersionInfoVersion {
     param([string]$SemanticVersion)
 
     if ([string]::IsNullOrWhiteSpace($SemanticVersion)) {
-        return '1.0.0.0'
+        return '1.2.0.0'
     }
 
     $coreVersion = ($SemanticVersion -split '[-+]')[0]

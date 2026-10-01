@@ -49,7 +49,7 @@ global gScripts := [
             Map("id","num_remessa",    "label","Remessa Existente",
                 "tipo","text",   "obrigatorio",false,
                 "hint","Deixe vazio para criar nova"),
-            Map("id","imprimir_relatorio", "label","Imprimir relatório do fechamento",
+            Map("id","imprimir_relatorio", "label","Imprimir relatório",
                 "tipo","checkbox", "obrigatorio",false, "default",true)
         ]
     )
