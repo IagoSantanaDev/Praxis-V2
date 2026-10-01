@@ -67,6 +67,12 @@ Os owners dos padrões deste repo:
 | Fluxo 03, `FX_*` | `scripts/fechar_xml.ahk` |
 | UI, contrato de mensagens, forms | `ui/index.html` (arquivo único e completo) |
 | Registro de scripts e params | `gScripts` em `main.ahk` |
+| Primitivas de teste, `TESTE_*` | `tests/lib/teste_lib.ahk` |
+
+`tests/` é **independente do app**: não entra na cadeia de `#Include` de `main.ahk`, não aparece em
+`gScripts`, e o leak-check do staging nunca o vê. Gate próprio: `tests/teste_espera_cursor.ahk` sai
+com o número de falhas (0 = passou) e não toca no MV2000i. `tests/teste_baixa_cursor.ahk` **exige o
+MV2000i real** e ainda não rodou nele — treatá-lo como não validado.
 
 ## 3. Validação obrigatória
 
@@ -244,6 +250,31 @@ Erros aqui não dão erro visível: produzem tela errada, planilha errada ou rem
 - **`{Down 121}` em `protocolar.ahk:94` (`PR_RELATORIO_DOWN_N`) é posicional** e nunca foi
   validado: depende da ordenação do relatório na estação do hospital. Se mudar lá, o fluxo gera a
   planilha errada sem erro visível.
+- **`Array.Has()` no AHK v2 é por ÍNDICE, e `Array.Contains` não existe** (medido no
+  AutoHotkey64 v2.0.26: `["Wait"].Has("Wait")` devolve `0`, e `Contains` lança *"has no method
+  named Contains"*). Usar `Has` para testar **valor** em lista devolve sempre falso — sem erro.
+  Foi exatamente o que deixou o gate de cursor de `tests\teste_espera_cursor.ahk` responder
+  "pronto" para sempre. Busca por valor em lista é `TESTE_Contem` (`tests\lib\teste_lib.ahk`),
+  em laço explícito.
+- **`MouseGetCursor()` não existe no AHK v2.** A API é a variável embutida **`A_Cursor`**
+  (`AppStarting`, `Arrow`, `Cross`, `Help`, `IBeam`, `Icon`, `No`, `Size*`, `UpArrow`, `Wait`,
+  `Unknown` — cursor de mão é `Unknown`). Confirmado pelo índice de funções do v2 e pela tabela de
+  strings UTF-16 do binário instalado (0 ocorrências de `MouseGetCursor`, 1 de `MouseGetPos`).
+  A única função de mouse do v2 é a de **posição**. Isso já está automatizado em
+  `TESTE_GuardPadroesProibidos`.
+- **Prazo de espera nunca por soma com `A_TickCount`.** `A_TickCount` zera depois de ~49,7 dias;
+  uma estação que não reinicia chega lá e `"A_TickCount + timeout"` vira prazo negativo, ou seja,
+  espera de **zero** — sem erro visível. Use sempre decorrido: `(A_TickCount - startedAt) >= t`.
+  Coberto por guard e por teste unitário.
+- **`global X := ""` no topo do script NÃO é a mesma variável que `global X` dentro de função.**
+  Medido: o setter escrevia e a leitura dentro da função voltava vazia. No topo, atribuição simples
+  (`X := ""`) cria a global de verdade. E **função `=>` (arrow) tem escopo local e não enxerga
+  global** — para tocar em global, use função normal com `global`.
+- **Um script AHK que "trava" sem saída quase sempre é o diálogo de erro, não laço infinito.**
+  Rodar por duplo clique e esperar não dá diagnóstico nenhum. Dois caminhos que funcionam:
+  `AutoHotkey64.exe /ErrorStdOut=UTF-8 <script>` para erro de carga, e ler o `RICHEDIT50W1` da
+  janela `#32770` cujo título é o nome do script para erro de runtime. `Start-Process ... -Wait`
+  em script GUI não retorna exit code: use `.WaitForExit(ms)`.
 - **`#Include *i build\generated\*.ahk` é opcional e case-insensitive.** Em dev o app funciona sem
   esses arquivos. São gerados e apagados a cada build (`build/generated/` é gitignored). Não edite
   à mão e não comite.
