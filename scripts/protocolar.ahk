@@ -176,7 +176,13 @@ RunProtocolar(params) {
     ; e fecha a última tela com Ctrl+Q.
     PR_RecuperarTelas(cfg)
 
-    relatorio := "Protocolar concluído.`n`n"
+    ; O cabeçalho precisa refletir o que aconteceu: um lote parado no meio não
+    ; é "concluído", e dizer que é leva o operador a achar que a remessa inteira
+    ; foi para o MV.
+    if (resultado["travou"] != "")
+        relatorio := "Protocolar PARADO no meio do lote.`n`n"
+    else
+        relatorio := "Protocolar concluído.`n`n"
     relatorio .= "Remessas: " cfg["remessas"] "`n"
     relatorio .= "Setor " cfg["setorAtual"] " → " cfg["setorEnvio"] " | tipo " tipo "`n"
     relatorio .= "Contas na planilha: " contas.Length "`n"
@@ -184,6 +190,18 @@ RunProtocolar(params) {
     relatorio .= "Documentos pendentes baixados: " resultado["pendentes"].Length "`n"
     relatorio .= "Setores divergentes corrigidos: " resultado["setores"].Length "`n"
     relatorio .= "Tempo total: " MV_FormatDuration(A_TickCount - totalStart) "`n`n"
+    ; Lista concreta das contas que o MV recebeu. Sem ela, "N contas aceitas"
+    ; não diz QUAIS, e o operador não consegue conferir no MOV DOC.
+    if (resultado["enviadas"].Length > 0) {
+        relatorio .= "CONTAS ENVIADAS AO MV (" resultado["enviadas"].Length ")`n"
+        relatorio .= "  " JoinPR(resultado["enviadas"], ", ") "`n"
+    }
+    if (resultado["travou"] != "") {
+        relatorio .= "LOTE PARADO na conta " resultado["travou"]
+        relatorio .= " (índice " resultado["enviadas"].Length "/" contas.Length "). "
+        relatorio .= "As contas acima JÁ foram enviadas e não precisam ser reenviadas. "
+        relatorio .= "As contas a partir da que travou NÃO foram enviadas.`n`n"
+    }
     ; Aspas entre o texto e a variável para o AHK não ler "Down" como nome de variável.
     relatorio .= "PENDENTE: a posição do relatório no FFCV foi aberta por {Down }" PR_RELATORIO_DOWN_N
     relatorio .= " (posicional, sem validação). Se a ordenação do relatório mudar na estação, "
@@ -201,7 +219,7 @@ RunProtocolar(params) {
             relatorio .= "  conta " item["conta"] " | recebido " item["setorRecebido"] " | novo protocolo " item["protocolo"] "`n"
     }
     if (resultado["erros"].Length > 0) {
-        relatorio .= "`n[[red]]ERROS`n"
+        relatorio .= "`n[[red]]ERROS[[/red]]`n"
         for _, item in resultado["erros"]
             relatorio .= "  " item "`n"
     }
@@ -583,7 +601,11 @@ PR_SplitCsvLine(line, sep := ";") {
 ; ════════════════════════════════════════════════════════════════
 
 PR_Fase3EnviarContas(cfg, contas) {
-    resultado := Map("aceitas", 0, "pendentes", [], "setores", [], "erros", [])
+    ; "enviadas" é a lista concreta do que foi aceito pelo MV, e "travou" a conta
+    ; que impediu o lote de seguir. O `throw` anterior perdia as duas: o relatório
+    ; não chegava a ser montado e o operador ficava sem saber quantas contas
+    ; entraram antes de travar.
+    resultado := Map("aceitas", 0, "pendentes", [], "setores", [], "erros", [], "enviadas", [], "travou", "")
 
     if !MV_EnsureMovDoc()
         return PR_Erro("Não foi possível acessar o MOV DOC. Abra e autentique o MOV DOC no MV2000i e tente de novo.")
@@ -609,6 +631,7 @@ PR_Fase3EnviarContas(cfg, contas) {
 
         Notify("Conta " indice "/" total ": " conta ".")
         PR_EnviarConta(conta)
+        resultado["enviadas"].Push(conta)
 
         popup := PR_EsperarPopupMv(PR_POPUP_CONTA_TIMEOUT_MS)
         if (popup = 0) {
@@ -627,11 +650,23 @@ PR_Fase3EnviarContas(cfg, contas) {
                 resultado["setores"].Push(Map("conta", conta, "setorRecebido", classificacao["setorRecebido"],
                     "protocolo", classificacao["protocolo"]))
         } else {
-            ; Mensagem NÃO reconhecida aborta. Nunca seguir operando em popup que
-            ; não se entendeu: a ação errada aqui mexe em setor e protocolo.
-            ; O popup fica aberto de propósito — o texto é a evidência.
+            ; PARA O LOTE, mas não por `throw`. Um popup que não fecha (ou uma
+            ; mensagem que não se reconhece) deixa o MOV em estado que não
+            ; sabemos ler: a conta seguinte não pode ser enviada com segurança,
+            ; e inventar o estado do popup seria exatamente o tipo de erro
+            ; silencioso que este projeto evita. O popup fica aberto de
+            ; propósito — o texto é a evidência para o operador.
+            ;
+            ; O `throw` era pior que parar: ele subia até o catch de
+            ; RunProtocolar, que só devolvia a mensagem, e TODO o resultado da
+            ; Fase 3 ia junto no descarte — as contas aceitas, os documentos
+            ; pendentes baixados e os setores corrigidos sumiam do relatório.
+            ; Parar aqui preserva o que já foi feito e nomeia a conta que travou.
             resultado["erros"].Push("Conta " conta ": " classificacao["erro"])
-            throw Error(classificacao["erro"])
+            resultado["travou"] := conta
+            Notify("Conta " conta " travou o lote: " classificacao["erro"]
+                " As " resultado["aceitas"] " conta(s) já aceitas pelo MV permanecem válidas.")
+            break
         }
 
         Progress(25 + Round(55 * indice / total))
@@ -756,11 +791,12 @@ PR_TratarPopup(cfg, conta, popup) {
         if !PR_FecharPopupMv(popup)
             return PR_ClassifErro("Conta " conta ": reconheci setor divergente (" setorRecebido
                 "), mas não consegui fechar o popup do MV.")
-        if !PR_CorrigirSetorDaContaEBaixar(cfg, conta, setorRecebido)
+        protocoloCorrigido := PR_CorrigirSetorDaContaEBaixar(cfg, conta, setorRecebido)
+        if !protocoloCorrigido
             return PR_ClassifErro("Conta " conta ": não consegui corrigir o setor " setorRecebido
                 " nem baixar o protocolo novo.")
         return Map("estado", "ok", "tipo", "setor_divergente", "setorRecebido", setorRecebido,
-            "protocolo", "", "erro", "")
+            "protocolo", protocoloCorrigido, "erro", "")
     }
 
     return PR_ClassifErro("Conta " conta ": popup do MV não reconhecido. Texto lido: " PR_ResumirTexto(texto))
@@ -774,6 +810,15 @@ PR_ResumirTexto(texto, limite := 240) =>
 PR_LerMensagemPopup(popup) {
     ; WinGetText/Window Spy NÃO expõem a mensagem desses modais: eles devolvem só
     ; "&OK". A leitura passa por OCR da área client da janela.
+    ;
+    ; Ativa ANTES do screenshot: FFCV_ResolveOcrRegion captura a tela, e um
+    ; print pega o que estiver em primeiro plano — se o MV estiver atrás de
+    ; outro app, o OCR lê a janela errada e a classificação do popup sai sobre
+    ; o texto de outra coisa. PR_FecharPopupMv ativa depois de ler, o que não
+    ; corrigiria nada.
+    if !MV_EnsureWindowActive("ahk_id " popup, 3)
+        Notify("Aviso: não consegui ativar o popup do MV antes do OCR; a leitura pode estar parcial.")
+
     region := FFCV_ResolveOcrRegion("ahk_id " popup)
     if !region["ok"]
         return ""
@@ -913,7 +958,11 @@ PR_CorrigirSetorDaContaEBaixar(cfg, conta, setorRecebido) {
     if !PR_BaixarProtocolo(protocoloNovo)
         return PR_Erro("Conta " conta ": não consegui baixar o protocolo novo " protocoloNovo ".")
 
-    return true
+    ; Devolve o protocolo novo, e não `true`: o relatório da Fase 4 imprime
+    ; item["protocolo"] das contas com setor corrigido, e devolvendo um booleano
+    ; esse campo saía sempre em branco — a linha do relatório ficava sem o número
+    ; que o operador precisa para conferir a correção no MOV DOC.
+    return protocoloNovo
 }
 
 PR_CopyFocusedNumericText(timeoutMs := 600) {
@@ -1223,23 +1272,24 @@ PR_EsperarSumir(winTitle, timeoutMs) {
 PR_EsperarJanelaEstavel(winTitle, stableMs, timeoutMs) {
     startedAt := A_TickCount
     stableSince := 0
-    lastCount := -1
+    ; Assinatura, e não contagem de controles: o MV troca de tela no MESMO HWND
+    ; sem alterar a contagem (medido: 1 → 1, só o título muda), então a contagem
+    ; dava "tela perfeitamente estável" para uma tecla engolida — exatamente o
+    ; antipadrão que o AGENTS.md proíbe. MV_ScreenSignature já inclui o título.
+    ultimaAssinatura := ""
 
     Loop {
         if (WinExist(winTitle) && !PR_Abortado()) {
-            try hwnds := WinGetControlsHwnd(winTitle)
-            catch
-                hwnds := []
-            count := hwnds.Length
+            assinatura := MV_ScreenSignature(winTitle)
 
-            if (WinActive(winTitle) && count = lastCount) {
+            if (WinActive(winTitle) && assinatura = ultimaAssinatura) {
                 if (stableSince = 0)
                     stableSince := A_TickCount
                 if (A_TickCount - stableSince >= stableMs)
                     return true
             } else {
                 stableSince := 0
-                lastCount := count
+                ultimaAssinatura := assinatura
             }
         }
 
