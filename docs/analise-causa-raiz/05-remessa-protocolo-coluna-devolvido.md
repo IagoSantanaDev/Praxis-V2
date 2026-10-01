@@ -27,30 +27,20 @@ O ponto 2 não é estilo: é o que impede a linha 1 de escapar. Ver seção 4.
 
 ## 2. O mapa linha → ClassNN
 
-Medido pelo Window Spy do operador, uma captura por linha, todas com
-`client x 679`, `w 19`, `h 23`:
+O mapa foi confirmado pelo Window Spy do operador, com uma captura por linha.
+O fluxo usa o `ClassNN` exato da janela do MOV DOC; não usa coordenadas para
+localizar esses checkboxes.
 
-| Linha | `MOVDOC_GRID_ROWS_Y` | Y medido | ClassNN |
-|---|---|---|---|
-| 1ª | 222 | 224 | `Button5` |
-| 2ª | 245 | 247 | `Button4` |
-| 3ª | 268 | 270 | `Button3` |
-| 4ª | 291 | 293 | `Button2` |
+| Linha | ClassNN |
+|---|---|
+| 1ª | `Button5` |
+| 2ª | `Button4` |
+| 3ª | `Button3` |
+| 4ª | `Button2` |
 
 ```ahk
 MOVDOC_CHECK_DEVOLVIDO_CLASSES := ["Button5", "Button4", "Button3", "Button2"]
-MOVDOC_CHECK_DEVOLVIDO_X := 679
-MOVDOC_CHECK_DEVOLVIDO_TOL := 12
 ```
-
-O Y medido é sempre `MOVDOC_GRID_ROWS_Y + 2`, porque o Spy reporta o topo do
-controle e a constante é o topo da linha. A diferença de 2 px fica dentro da
-tolerância de 12.
-
-**Por que a tolerância é 12 e não o default 35.** A coluna "Recebido" fica em
-x 718, a 39 px. Com 35, `MV_FindControlByClientPoint` poderia aceitar o
-checkbox da coluna vizinha — e devolver o estado da coluna errada, que é falha
-silenciosa com consequência errada.
 
 **O mapa é do operador e vale mais que dedução.** Uma versão anterior deste
 documento propôs prefixo de classe + geometria, partindo da premissa de que o
@@ -62,22 +52,27 @@ implementação também.
 `RP_CheckGridDevolvido(indiceLinha)` (`scripts/remessa_protocolo.ahk`)
 
 ```ahk
-hwnd := MV_FindControlByClientPoint(
-    WIN_MOVDOC_BAIXA,
-    MOVDOC_CHECK_DEVOLVIDO_CLASSES[indiceLinha],
-    MOVDOC_CHECK_DEVOLVIDO_X,
-    MOVDOC_GRID_ROWS_Y[indiceLinha],
-    MOVDOC_CHECK_DEVOLVIDO_TOL)
-if !hwnd
-    return ""
-try return ControlGetChecked(hwnd)
+classNN := MOVDOC_CHECK_DEVOLVIDO_CLASSES[indiceLinha]
+try hwnds := WinGetControlsHwnd(WIN_MOVDOC_BAIXA)
 catch
     return ""
+
+for hwnd in hwnds {
+   try ctrlClass := ControlGetClassNN(hwnd)
+   catch
+      continue
+   if (ctrlClass != classNN)
+      continue
+   try return ControlGetChecked(hwnd)
+   catch
+      return ""
+}
+return ""
 ```
 
-Busca por **igualdade exata** de `ClassNN` — `MV_FindControlByClientPoint` já
-existia no contrato compartilhado e compara com `if (ctrlClass != classNN)`.
-A coordenada serve só para confirmar que o controle é o da linha certa.
+`RP_CheckGridDevolvido` enumera os controles de `WIN_MOVDOC_BAIXA` e compara o
+`ClassNN` por igualdade exata antes de ler o estado. Não depende de coordenada,
+posição, tolerância ou prefixo de classe.
 
 `ControlGetChecked` funciona em checkbox do Oracle Forms: é o mesmo mecanismo
 do checkbox "Recebido" (`MOVDOC_CHECK_RECEBIDO_CLASS`, lido por
@@ -103,18 +98,17 @@ dinheiro sem sinal.
 
 A grid entra no fluxo por **dois** caminhos, e a linha 1 é um deles.
 
-**A semente.** Depois do F8, `RP_WaitMovDocFirstGridLineReady` espera a
-primeira linha ficar legível e monta o Map dela. Esse Map é empurrado em
-`RP_ColetarLinhasMovDoc`, **fora** do laço que lê as 4 linhas visíveis. Um
-`if` de Devolvido colocado só dentro desse laço **não alcança** a linha 1: ela
-já entrou em `linhas` antes.
+**A semente.** Depois do F8, `RP_WaitMovDocFirstGridLineReady` lê primeiro os
+quatro estados de Devolvido e só então tenta ler conta e convênio da primeira
+linha. A linha e essa amostra dos checkboxes são passadas a
+`RP_ColetarLinhasMovDoc`; a linha 1 só entra em `linhas` depois de ser filtrada.
 
 **O laço.** `RP_ColetarLinhasVisiveisMovDoc` lê as 4 linhas visíveis, pagina,
 e repete até 100 vezes.
 
-Ler os 4 checkboxes no topo de `RP_ColetarLinhasMovDoc` **e** no topo de
-`RP_ColetarLinhasVisiveisMovDoc` cobre os dois caminhos, e satisfaz a ordem
-exigida: nenhuma conta é copiada antes de os 4 estados serem conhecidos.
+Na primeira coleta, `RP_ColetarLinhasVisiveisMovDoc` reutiliza a amostra feita
+antes da leitura da linha-semente. Após cada rolagem, lê os quatro checkboxes
+novamente antes de copiar conta ou convênio das linhas visíveis.
 
 A chave de dedupe `vistos` usa `protocolo "|" conta "|" convenio` e é montada em
 dois lugares (a semente e o laço). Os dois precisam continuar iguais.
@@ -175,10 +169,7 @@ existem em um lugar só. A duplicação não é tocada.
 
 ## 7. PENDENTE
 
-- **A largura real da banda em outras resoluções e escalas de DPI.** X = 679 e a
-  tolerância de 12 vêm das capturas em uma máquina. O `MOVDOC_CHECK_DEVOLVIDO_TOL`
-  é o ajuste mais provável de ser necessário em outra estação.
-- **A leitura é estável depois do clique na conta.** O Devolvido é lido antes de
+- **A leitura é estável antes do clique na conta.** O Devolvido é lido antes de
   qualquer clique na conta, o que é a ordem correta por construção — mas se o
   Forms só atualizar o checkbox após o foco passar pela linha, a leitura vem
   adiantada. Observar na primeira execução.
