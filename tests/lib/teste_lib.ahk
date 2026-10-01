@@ -59,6 +59,75 @@ TESTE_MENU_STEP_MS := 100
 ; NÃO é versionada (.gitignore:41) — a proveniência é herdada, não verificada.
 TESTE_BAIXA_BTN := "Button1"
 
+; ── Checkboxes da grid da tela de baixa ─────────────────────────
+; Cópia literal do contrato de scripts\remessa_protocolo.ahk L51 e L55. O
+; ClassNN é fixo por POSIÇÃO na tela (não por registro), confirmado pelo
+; Window Spy do operador — provência em remessa_protocolo.ahk L53.
+;   Devolvido: linha 1 -> Button5, 2 -> Button4, 3 -> Button3, 4 -> Button2
+;   Recebido:  linha 1 -> Button9, 2 -> Button8, 3 -> Button7, 4 -> Button6
+TESTE_CHECK_DEVOLVIDO_CLASSES := ["Button5", "Button4", "Button3", "Button2"]
+TESTE_CHECK_RECEBIDO_CLASSES  := ["Button9", "Button8", "Button7", "Button6"]
+; Y client de cada linha da grid. Fonte: remessa_protocolo.ahk L42. Serve só
+; para o operador correlacionar o checkbox lido com a linha na tela.
+TESTE_GRID_ROWS_Y := [222, 245, 268, 291]
+
+; Estado cru de um checkbox, sem interpretar nada.
+; Medido no AutoHotkey64 2.0.26: ControlGetChecked NÃO lança exceção em controle
+; Desabilitado, Hidden, nem em controle que não é checkbox — devolve 0 nos três
+; casos. -1 só aparece em estilo BS_3STATE. Por isso o relatório mostra tipo e
+; valor crus: a diferença entre "não achou o controle", "desmarcado" e
+; "indeterminado" é exatamente o que este diagnóstico precisa expor.
+; Devolve Array de Map, um por hwnd encontrado. Vazio = ClassNN inexistente
+; naquela janela.
+TESTE_InspecionarCheckbox(hwndJanela, classNN) {
+    achados := []
+
+    try hwnds := WinGetControlsHwnd("ahk_id " hwndJanela)
+    catch
+        return achados
+
+    for hwnd in hwnds {
+        try ctrlClass := ControlGetClassNN(hwnd)
+        catch
+            continue
+        if (ctrlClass != classNN)
+            continue
+
+        reg := Map("classNN", classNN, "hwnd", hwnd)
+
+        try reg["valor"] := ControlGetChecked(hwnd)
+        catch as err
+            reg["valor"] := "(excecao: " err.Message ")"
+
+        reg["tipo"] := Type(reg["valor"])
+
+        try reg["visivel"] := ControlGetVisible(hwnd) ? "sim" : "nao"
+        catch
+            reg["visivel"] := "?"
+
+        try reg["habilitado"] := ControlGetEnabled(hwnd) ? "sim" : "nao"
+        catch
+            reg["habilitado"] := "?"
+
+        try reg["texto"] := ControlGetText(hwnd)
+        catch
+            reg["texto"] := ""
+
+        try {
+            ControlGetPos &x, &y, &w, &h, hwnd
+            reg["pos"] := x "," y "," w "," h
+            reg["y"] := y
+        } catch {
+            reg["pos"] := "?"
+            reg["y"] := "?"
+        }
+
+        achados.Push(reg)
+    }
+
+    return achados
+}
+
 ; ── Polling ────────────────────────────────────────────────────
 TESTE_POLL_MS := 100
 ; O cursor troca antes do layout da tela; 100ms (MV_POLL_MS) seria lento
@@ -400,5 +469,6 @@ TESTE_ArquivosDoTeste() {
         A_ScriptDir "\lib\teste_lib.ahk",
         A_ScriptDir "\teste_espera_cursor.ahk",
         A_ScriptDir "\teste_baixa_cursor.ahk",
+        A_ScriptDir "\teste_grid_checkbox.ahk",
     ]
 }
