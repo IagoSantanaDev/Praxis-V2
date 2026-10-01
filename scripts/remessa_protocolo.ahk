@@ -181,10 +181,15 @@ RunRemessaProtocolo(params) {
         result := ProcessarProtocolo(protocolo)
 
         if !result["ok"] {
-            ; Numa falha, as devolvidas do protocolo entram no relatório mesmo
-            ; assim: são a explicação mais provável de "não identificou convênio".
+            ; "Todas as contas do protocolo X estão devolvidas" é exatamente o
+            ; caso que o operador precisa ver WHICH contas. A lista ia para
+            ; `avisos` e era perdida: o abort carrega só result["erro"] e o
+            ; relatório final nunca chega a rodar. A lista entra na própria
+            ; mensagem de abort.
             for _, d in result["devolvidas"]
                 avisos.Push(d)
+            if (avisos.Length > 0)
+                return RP_Abort(result["erro"] "`nContas devolvidas:`n" RP_FormatarAvisos(avisos))
             return RP_Abort(result["erro"])
         }
 
@@ -472,9 +477,17 @@ RP_ColetarLinhasVisiveisMovDoc(protocolo, linhas, vistos, avisos := []) {
         if RP_LinhaDevolvida(devolvidos, i) {
             contaDev := RP_ReadMovDocGridField(MOVDOC_CONTA_X, rowY, "conta")
             if (contaDev != "" && contaDev != protocolo) {
-                avisos.Push(Map("protocolo", protocolo, "conta", contaDev,
-                    "descricao", "Conta devolvida"))
-                Notify("Conta " contaDev " devolvida — não segue para a remessa.")
+                ; Marca em `vistos` para a mesma conta devolvida vista em outra
+                ; página da grid não gerar o aviso duas vezes. A chave é menor que
+                ; a da linha normal de propósito: aqui não se lê o convênio, e
+                ; `protocolo|conta` nunca colide com `protocolo|conta|convênio`.
+                chave := protocolo "|" contaDev
+                if !vistos.Has(chave) {
+                    vistos[chave] := true
+                    avisos.Push(Map("protocolo", protocolo, "conta", contaDev,
+                        "descricao", "Conta devolvida"))
+                    Notify("Conta " contaDev " devolvida — não segue para a remessa.")
+                }
             } else {
                 Notify("Aviso: linha " i " marcada como devolvida, mas não consegui ler a conta dela.")
             }
