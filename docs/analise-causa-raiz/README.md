@@ -73,7 +73,7 @@ A ordem não é por número de documento. É por custo de não agir.
 ### 1º — doc 03, a data em formato americano
 
 Causa fechada **e confirmada pelo operador**: o MV2000i não aceita `YYYY-MM-DD`.
-Como as duas datas são obrigatórias (`main.ahk:82-88`), isso significa que o
+Como as duas datas são obrigatórias (`main.ahk:84-88`), isso significa que o
 módulo Fechar&XML **não conclui execução nenhuma** enquanto o defeito
 existir. A correção é uma função de string, e o retorno é o maior possível de
 toda esta lista.
@@ -133,7 +133,7 @@ Um ponto que não é bug e que este conjunto de documentos registra de propósit
 porque a leitura natural dos arquivos induz ao erro:
 
 O `Praxis_TO-DO/Protocolar/protocolar.ahk` (validado) fecha a tela da baixa
-com `^q` **e depois** `{Enter}` (`protocolar.ahk:1124-1134`, comentário
+com `^q` **e depois** `{Enter}` (`Praxis_TO-DO/Protocolar/protocolar.ahk:1124-1134`, comentário
 explícito "Fluxos como a baixa usam Ctrl+Q e depois Enter"). O Praxis envia
 **`^q` puro**. Isso está confirmado pelo operador como correto e **não deve ser
 "corrigido"** para incluir o `Enter`. Ver [doc 04](04-remessa-protocolo-ctrl-q-nao-sai.md).

@@ -26,7 +26,7 @@ As duas linhas anteriores mostram que o fluxo chegou a acionar "Gerar Arquivo"
 
 `PR_JanelaVisivel` testa o bit errado da estilo de janela.
 
-`scripts/protocolar.ahk:1337-1343`
+`scripts/protocolar.ahk:1390-1401`
 
 ```ahk
 PR_JanelaVisivel(hwnd) {
@@ -89,7 +89,7 @@ e ele falha para qualquer janela de diálogo.
 
 ### 2.2 O caminho de detecção
 
-`scripts/protocolar.ahk:433-453`
+`scripts/protocolar.ahk:454-474`
 
 ```ahk
 PR_EsperarJanelaSaveAs(timeoutSec) {
@@ -111,7 +111,7 @@ Este é o **único** filtro. Não há alternativa: o `for` itera a lista, o gate
 sempre falha, o laço externo só termina por timeout, e o chamador converte
 `0` em erro fatal.
 
-`scripts/protocolar.ahk:270-272`
+`scripts/protocolar.ahk:291-293`
 
 ```ahk
 salvar := PR_EsperarJanelaSaveAs(PR_SALVAR_TIMEOUT_SEG)
@@ -149,7 +149,7 @@ Os cinco primeiros não têm alternativa:
 Só o primeiro fallback de `PR_EsperarPopupRemessa` sobrevive, porque ele não
 passa pelo gate:
 
-`scripts/protocolar.ahk:328-334`
+`scripts/protocolar.ahk:349-355`
 
 ```ahk
 try hwnd := WinExist(PR_WIN_FFCV_REMESSASQL)
@@ -169,7 +169,7 @@ que ainda funciona, e a do "Salvar como" não tem caminho nenhum.
 
 Este é o item mais grave desta análise e **não está no TO-DO**.
 
-`scripts/protocolar.ahk:606-615`
+`scripts/protocolar.ahk:631-644`
 
 ```ahk
 PR_EnviarConta(conta)
@@ -186,16 +186,23 @@ if (popup = 0) {
 classificacao := PR_TratarPopup(cfg, conta, popup)
 ```
 
-`PR_EsperarPopupMv` (`scripts/protocolar.ahk:709-725`) faz o mesmo
+`PR_EsperarPopupMv` (`scripts/protocolar.ahk:747-764`) faz o mesmo
 `if PR_JanelaVisivel(w)` e por isso **devolve `0` sempre**. A consequência é
 direta: a linha `resultado["aceitas"]++` roda para **toda** conta, e
-`PR_TratarPopup` — a Fase 4, que classifica documento pendente, setor recebido
-e erro — **nunca executa**.
+`PR_TratarPopup` — a Fase 4, que classifica documento pendente e setor recebido
+e trata o popup não reconhecido — **nunca executa**.
 
-Uma conta recusada pelo MV (documento pendente, setor não recebido, convênio
-divergente, conta já em remessa) é reportada como aceita, sem erro e sem
-pendência no relatório. Os contadores `aceitas`/`pendentes`/`setores` do
-resumo_final não descrevem o que aconteceu no MV.
+Uma conta que o MV recusou com popup (documento pendente, setor não recebido) é
+reportada como aceita, sem erro e sem pendência no relatório. Os contadores
+`aceitas`/`pendentes`/`setores` do resumo_final não descrevem o que aconteceu
+no MV.
+
+> **Não existe "conta recusada" no Protocolar.** `PR_TratarPopup` tem dois ramos
+> de recuperação (documento pendente, setor divergente) e um de não reconhecido,
+> e só esses. Não há ramo de recusa: uma conta sem popup é **aceita**, e um popup
+> reconhecido é corrigido e reprocessado. A palavra "recusada" neste documento
+> descreve o efeito observável — conta que não devia ter entrado e entrou —, não
+> um ramo do código.
 
 Isto é falha silenciosa no sentido do `AGENTS.md`: produz resultado errado sem
 erro visível, e a automação continua como se estivesse saudável.
@@ -204,7 +211,7 @@ erro visível, e a automação continua como se estivesse saudável.
 
 ### 4.1 Correção mínima, obrigatória
 
-`scripts/protocolar.ahk:1340` — um caractere:
+`scripts/protocolar.ahk:1398` — um caractere:
 
 ```ahk
     try return WinGetStyle("ahk_id " hwnd) & 0x10000000   ; WS_VISIBLE
@@ -227,7 +234,7 @@ dele está no próprio código:
 > Windows Server. Por isso ele é localizado pelos controles reais do popup, não
 > só por ahk_class/ahk_exe."*
 
-O `PR_EsperarPopupRemessa` (`scripts/protocolar.ahk:312-391`) preserva essa
+O `PR_EsperarPopupRemessa` (`scripts/protocolar.ahk:333-412`) preserva essa
 filosofia com cinco fallbacks; o `PR_EsperarJanelaSaveAs` não. Propõe-se
 portar a mesma estrutura: um predicado único de identificação do diálogo
 equivalente ao `IsSaveAsWindow` validado
@@ -249,7 +256,7 @@ O `PR_EsperarJanelaSaveAs` é a exceção, não o padrão.
 
 ### 4.3 Constantes do diálogo — sem mudança
 
-`scripts/protocolar.ahk:77-78`
+`scripts/protocolar.ahk:81-82`
 
 ```ahk
 PR_SALVAR_CAMPO_NOME    := "Edit1"
@@ -293,8 +300,9 @@ Checklist no MV, com o Protocolar e `imprimir_salvar_envio = Sim`:
 2. **`PR_EsperarPopupMv` passa a devolver o hwnd quando há popup.** Este é o
    item que valida a seção 3.1 e **não** aparece no sintoma original — se
    continuar devolvendo `0`, o gate não foi o único problema.
-3. O `Fase 4` (`PR_TratarPopup`) executa: uma conta propositalmente recusada
-   pelo MV aparece como pendência no relatório, e não como aceita.
+3. O `Fase 4` (`PR_TratarPopup`) executa: uma conta que o MV barra com popup de
+   documento pendente ou de setor divergente aparece como pendência/setor
+   corrigido no relatório, e não como aceita.
 4. `PR_FecharRelatoriosDeFundo` fecha a janela do `RWRBE60.EXE`.
 5. Os cinco fallbacks de `PR_EsperarPopupRemessa` respondem, se a cadeia de
    4.2 foi implementada.

@@ -30,7 +30,7 @@ com a data errada indo para o faturamento e para o XML enviado à operadora.
 O caso 1 tem um efeito que o TO-DO não menciona: **o módulo Fechar&XML não
 consegue concluir execução nenhuma.**
 
-`main.ahk:82-88`
+`main.ahk:84-88`
 
 ```ahk
 Map(
@@ -99,7 +99,7 @@ fluxo Remessa por Protocolo. Ver seção 4.
 
 ### 2.1 A UI entrega ISO 8601, por especificação
 
-`ui/index.html:329-332`
+`ui/index.html:330-333`
 
 ```js
 } else {
@@ -108,7 +108,7 @@ fluxo Remessa por Protocolo. Ver seção 4.
 }
 ```
 
-Com `tipo` = `"date"` (declarado em `main.ahk:46-49` e `main.ahk:84-87`), isto
+Com `tipo` = `"date"` (declarado em `main.ahk:48-50` e `main.ahk:84-88`), isto
 produz `<input type="date">`.
 
 O atributo `value` de um `<input type="date">` é **sempre** `YYYY-MM-DD`, por
@@ -119,7 +119,7 @@ não são o mesmo formato, e o cache não é a fonte do problema.
 
 ### 2.2 O valor atravessa três camadas sem transformação
 
-`ui/index.html:347-360`
+`ui/index.html:348-362`
 
 ```js
 function collectParams() {
@@ -135,7 +135,7 @@ function collectParams() {
 ```
 
 `main.ahk:266` repassa o objeto cru para `RunScript`, e
-`scripts/fechar_xml.ahk:48-49` só aplica `Trim`:
+`scripts/fechar_xml.ahk:52-53` só aplica `Trim`:
 
 ```ahk
 dataEntrega    := Trim(params["data_entrega"])
@@ -146,7 +146,7 @@ dataVencimento := Trim(params["data_vencimento"])
 
 ### 2.3 A string ISO é digitada no campo de data do Oracle Forms
 
-`scripts/fechar_xml.ahk:221-228`
+`scripts/fechar_xml.ahk:307-312` — **estado na época da análise**, já corrigido:
 
 ```ahk
 Send("{Tab}")
@@ -159,6 +159,11 @@ SendText dataVencimento       ; "2026-09-30"
 ```
 
 O campo do Oracle Forms espera `dd/mm/aaaa`. É isso que o operador vê.
+
+> **Corrigido.** Hoje o mesmo trecho é `FX_ColarNoFoco(MV_NormalizarDataBr(dataEntrega))`
+> (`scripts/fechar_xml.ahk:309` e `:312`), e a conferência de leitura de volta
+> existe em `:314-320`. A descrição acima é preservada porque é a causa raiz
+> que o documento registra, não o código atual.
 
 ### 2.4 Por que o fluxo validado não tinha esse problema
 
@@ -193,9 +198,9 @@ Vale registrar o que **não** existe, porque a ausência é o que permite o
 defeito chegar até o FFCV:
 
 - **Nenhuma validação de formato** no `RunFecharXML`. As checagens em
-  `scripts/fechar_xml.ahk:51-56` verificam apenas se a string está vazia.
+  `scripts/fechar_xml.ahk:55-60` verificam apenas se a string está vazia.
 - **Nenhuma asserção de leitura de volta das datas.** O padrão já existe no
-  arquivo para o número da remessa (`scripts/fechar_xml.ahk:208-219`) e é
+  arquivo para o número da remessa (`scripts/fechar_xml.ahk:290-299`) e é
   justamente ele que teria pegado isto:
 
   ```ahk
@@ -213,7 +218,7 @@ defeito chegar até o FFCV:
 
 O mesmo defeito de contrato existe em `Remessa por Protocolo`.
 
-`main.ahk:46-49` — parâmetros de `remessa_protocolo`:
+`main.ahk:48-50` — parâmetros de `remessa_protocolo`:
 
 ```ahk
 Map("id","data_entrega",   "label","Data de Entrega",
@@ -222,7 +227,7 @@ Map("id","data_vencimento","label","Data de Vencimento",
     "tipo","date",   "obrigatorio",false)
 ```
 
-`main.ahk:84-87` — parâmetros de `fechar_xml`, ambos `"tipo","date"`,
+`main.ahk:84-88` — parâmetros de `fechar_xml`, ambos `"tipo","date"`,
 ambos obrigatórios.
 
 O consumo em `remessa_protocolo.ahk`:
@@ -234,8 +239,8 @@ dataEntrega  := params["data_entrega"]
 dataVenc     := params["data_vencimento"]
 ```
 
-que chega a `FinalizarComDatas` (`:220`) → `RP_PreencherDatasEntregaPorTeclado`
-(`:1168`), com a mesma mecânica de `SendText` no mesmo campo do FFCV.
+que chega a `FinalizarComDatas` (`:1320`) → `RP_PreencherDatasEntregaPorTeclado`
+(`:1389`), com a mesma mecânica de `SendText` no mesmo campo do FFCV.
 
 `protocolar` não é afetado: não tem parâmetro de data.
 
@@ -253,10 +258,10 @@ MV_NormalizarDataBr(valor) { ... }
 ```
 
 **Por que no AHK e não no JavaScript.** A alternativa é converter no
-`collectParams` (`ui/index.html:347`). Ela foi descartada por duas razões:
+`collectParams` (`ui/index.html:348`). Ela foi descartada por duas razões:
 
 1. **A definição de parâmetro está duplicada.** `gScripts` em `main.ahk:30` e
-   `devSim()` em `ui/index.html:423` descrevem os mesmos scripts. Uma regra de
+   `devSim()` em `ui/index.html:425` descrevem os mesmos scripts. Uma regra de
    formatação no JS precisaria ser aplicada nos dois lugares, e a
    `AGENTS.md` regra 4 manda procurar área compartilhada antes de criar, e a
    regra 2 proíbe padrão paralelo. Normalizando no AHK, a entrada duplicada
@@ -274,10 +279,10 @@ dos campos do Oracle Forms — daí o prefixo `MV_` (regra 4 da `AGENTS.md`).
 
 Nos dois consumidores, imediatamente antes do preenchimento:
 
-- `scripts/fechar_xml.ahk` — em `FX_PreencherDatasPorTeclado` (`:195`),
-  sobre os dois parâmetros, antes do `SendText` de `:223` e `:227`.
+- `scripts/fechar_xml.ahk` — em `FX_PreencherDatasPorTeclado` (`:274`),
+  sobre os dois parâmetros, antes da colagem de `:309` e `:312`.
 - `scripts/remessa_protocolo.ahk` — em `RP_PreencherDatasEntregaPorTeclado`
-  (`:1224`), chamado por `FinalizarComDatas` (`:1168`).
+  (`:1389`), chamado por `FinalizarComDatas` (`:1320`).
 
 Um helper só, dois chamadores — o que a regra 1 da `AGENTS.md` pede e o que a
 regra 5 proíbe parcelar.
@@ -290,7 +295,7 @@ devolvê-lo inalterado.
 
 ### 5.3 A defesa que faltava: asserção de leitura de volta
 
-O padrão de `scripts/fechar_xml.ahk:208-219` deve ser estendido às duas datas.
+O padrão de `scripts/fechar_xml.ahk:290-299` deve ser estendido às duas datas.
 A tela `Cadastro: Fatas e Remessas` já é focada e o valor pode ser lido depois
 do preenchimento.
 
@@ -314,7 +319,7 @@ string, e não no MV.
   (`& "$env:LOCALAPPDATA\Programs\AutoHotkey\v2\AutoHotkey64.exe" ".\main.ahk"`,
   que lê `ui\index.html` do disco e usa `devSim()`): selecionar 30/09/2026 nos
   campos de data e conferir em `devtools` — ou, sem devtools, no log, que hoje
-  já mostra o valorcru em `Notify` (`scripts/fechar_xml.ahk:230`):
+  já mostra o valorcru em `Notify` (`scripts/fechar_xml.ahk:322`):
   `Datas enviadas por teclado: entrega 2026-09-30, vencimento 2026-09-30.`
   Essa linha é a evidência mais barata que existe do defeito.
 - **Teste do helper isolado**, sem UI: o `MV_NormalizarDataBr` é função pura de
@@ -358,6 +363,6 @@ errado em silêncio está descartado.
   a string crua, a leitura de volta da seção 5.3 funciona sem ambiguidade. Se
   reinterpretar, a leitura de volta precisa de validação semântica, como o
   `RP_GridValueValid` faz para as grid do MOV DOC
-  (`scripts/remessa_protocolo.ahk:566-577`). **Só o MV responde.**
+  (`scripts/remessa_protocolo.ahk:684`). **Só o MV responde.**
 - **O que o `Protocolar` envia para o FFCV** não passa por este caminho e não
   foi verificado. Fora do escopo deste documento.

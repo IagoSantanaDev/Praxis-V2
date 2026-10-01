@@ -76,12 +76,19 @@ eu ter comparado um caminho de entrada com um caminho de chegada.
 
 Isto é o achado mais útil de ler o arquivo com atenção.
 
-`scripts/fechar_xml.ahk:161-162` justifica a remoção do relatório assim:
+`scripts/fechar_xml.ahk:215-219` justifica o tratamento do relatório assim:
 
 ```ahk
-; Sempre instância nova. O original imprimia "Relatório Atend." (Button9) antes de
-; abrir a entrega; o spec 03 decidiu não incluir — o botão não existe em todas as telas.
+; O relatório de atendimentos (Button9) é impresso ANTES, e só se o botão
+; existir. O validado faz exatamente esta checagem (`:136-139`): o botão
+; não está em todas as telas, e a navegação para entrega não pode depender
+; dele. Era a objeção que motivou a remoção do relatório no spec 03, e ela
+; já está resolvida na referência.
 ```
+
+> Texto atual. Na época desta análise o relatório estava removido; o
+> alinhamento posterior do commit `0892358` reintroduziu a impressão com a
+> checagem de prontidão do botão.
 
 O receio é real. E a referência **reconheceu exatamente o mesmo receio e o
 resolveu**:
@@ -145,10 +152,10 @@ abortar.
 
 ## 3. Por que as divergências existem
 
-`scripts/fechar_xml.ahk:16` declara:
+`scripts/fechar_xml.ahk:16-18` declara:
 
 ```ahk
-; Spec: .agents\workflows\03-fechar-xml.md
+; Spec previsto: .agents\workflows\03-fechar-xml.md — NÃO EXISTE no repositório
 ```
 
 Esse caminho está no `.gitignore` (`.gitignore:16`, `.agents/`) e **não existe
@@ -157,17 +164,21 @@ neste checkout** — o único arquivo sob `.agents/` é `LEARNINGS.md`, local.
 Duas divergências têm justificativa escrita no código, e ambas apontam para o
 mesmo lugar:
 
-`scripts/fechar_xml.ahk:161-162`
+`scripts/fechar_xml.ahk:215-219`
 
 ```ahk
-; Sempre instância nova. O original imprimia "Relatório Atend." (Button9) antes de
-; abrir a entrega; o spec 03 decidiu não incluir — o botão não existe em todas as telas.
+; O relatório de atendimentos (Button9) é impresso ANTES, e só se o botão
+; existir. O validado faz exatamente esta checagem (`:136-139`): o botão
+; não está em todas as telas, e a navegação para entrega não pode depender
+; dele. Era a objeção que motivou a remoção do relatório no spec 03, e ela
+; já está resolvida na referência.
 ```
 
-`scripts/fechar_xml.ahk:32`
+`scripts/fechar_xml.ahk:16-18`
 
 ```ahk
-; PENDENTE: não revalidado neste fluxo — só o workflow 01 rodou contra o MV2000i.
+; As 7 divergências contra o fluxo validado foram deliberadas contra esse spec,
+; e a direção definida foi alinhar ao validado.
 ```
 
 As divergências foram deliberadas, contra um spec que não está versionado. Isso
@@ -233,17 +244,25 @@ depende de nada e pode ser feito em qualquer momento.
 
 ### 5.2 Notas por item
 
-**D3 — preenchimento** (`scripts/fechar_xml.ahk:203-228`). Voltar à navegação
-por `Tab` da referência e remover o `Send("{Enter}")` de `:225`.
+**D3 — preenchimento** (`scripts/fechar_xml.ahk:301-312`). **Aplicado**: a
+navegação é por `Tab` + colar, como a referência, e o `Send("{Enter}")` entre os
+campos de data foi removido.
+
+```ahk
+; Navegação e escrita por Tab + colar, como o fluxo validado
+; (Fechar&XML.ahk:154-158). O Enter entre os campos de data foi removido:
+; o validado não o usa, e no Oracle Forms ele commitava o campo e podia
+; disparar a validação antes do segundo campo estar preenchido.
+```
 
 > **Conflito registrado, e a referência vence.** A referência usa `^a` nos
 > **três** campos, inclusive os dois de data — `PasteFocused(remessa, true)`,
 > `PasteFocused(pagamento, true)`, `PasteFocused(vencimento, true)`
 > (`Fechar&XML.ahk:154-158`), e é o argumento `selectAll` que dispara o
 > `SendInput("^a")` em `:440`. O comentário do Praxis em
-> `scripts/fechar_xml.ahk:201` — *"NÃO usar Ctrl+A: o Forms trata o atalho de
-> forma imprevisível nos campos de data"* — **contradiz a referência
-> validada**, e nesse caso específico a referência tem prioridade: ela rodou, o
+> `scripts/fechar_xml.ahk:305` — *"Colar em vez de digitar porque o Forms trata
+> digitação longa de forma inconsistente nos campos de data"* — **contradiz a
+> referência validada**, e nesse caso específico a referência tem prioridade: ela rodou, o
 > comentário é herança de um spec que não existe mais (seção 3).
 >
 > A observação original pode ter sido real, mas foi feita contra outra versão
@@ -322,7 +341,7 @@ decisão, e é por isso que nada se perde:
 Uma observação fica registrada, sem ação e sem promessa de captura: a barra
 de botões mostrada não tem "Voltar", e o contrato compartilhado declara
 `MV_XML_FORM_BTN_VOLTAR := "Button7" ; Voltar`
-(`scripts/mv_session.ahk:98`). Como `MV_ClickBySpec` cai em clique cego por
+(`scripts/mv_session.ahk:121`). Como `MV_ClickBySpec` cai em clique cego por
 coordenada quando o `ClassNN` não casa (ver
 [doc 06, seção 3](06-sistematico-origem-das-constantes.md#3-mv_clickbyspec-clique-cego-por-coordenada)),
 uma constante errada ali vira ação errada sem erro.

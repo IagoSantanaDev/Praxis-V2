@@ -101,7 +101,7 @@ Este item não é uma origem morta. É o mecanismo que **converte** uma
 constante errada em ação errada sem erro, e por isso aparece em três dos
 outros documentos.
 
-`scripts/mv_session.ahk:654-675`
+`scripts/mv_session.ahk:760-781`
 
 ```ahk
 MV_ClickBySpec(winTitle, classNN, x, y) {
@@ -140,16 +140,19 @@ nunca falho". Um chamador não consegue distinguir `true` por controle de
 
 Onde isso já pesa:
 
-- `scripts/fechar_xml.ahk:408` — `MV_XML_FORM_BTN_VOLTAR`, cujo `ClassNN` é
-  `Button7` e cuja tela, na única captura disponível, tem quatro botões e
+- `scripts/fechar_xml.ahk:551` e `:764` — `MV_XML_FORM_BTN_VOLTAR`, cujo `ClassNN`
+  é `Button7` e cuja tela, na única captura disponível, tem quatro botões e
   nenhum "Voltar" (ver
   [doc 02, seção 6](02-fechar-xml-divergencia-do-validado.md#6-capturas-em-images-fora-de-escopo)).
   O clique cego cai em `(731, 470)`.
-- `scripts/fechar_xml.ahk:181` — `FX_BTN_ABRIR_DATAS` (`Button6`, "5 - Entregar
-  Rem.").
-- `scripts/protocolar.ahk:266` — `PR_FFCV_BTN_GERAR_ARQUIVO` (`TBitBtn2`).
-- `scripts/fechar_xml.ahk:383`, `:398` — botão Faturamento e botão Salvar da
+- `scripts/protocolar.ahk:287`, `:382`, `:392` — `PR_FFCV_BTN_GERAR_ARQUIVO`
+  (`TBitBtn2`).
+- `scripts/fechar_xml.ahk:520`, `:541` — botão Faturamento e botão Salvar da
   tela XML.
+
+> `FX_BTN_ABRIR_DATAS` (`Button6`, "5 - Entregar Rem.") aparecia nesta lista e
+> **não existe mais**: foi removido junto com o hop por Manutenção de Remessa
+> (`scripts/fechar_xml.ahk:37-39`).
 
 Em todos esses, um `ClassNN` que deixa de casar **não produz erro**. Produz um
 clique no ponto, e o fluxo segue como se tivesse clicado no botão.
@@ -232,13 +235,14 @@ registro.
 
 Independente da escolha acima, há correções de baixo custo e sem risco:
 
-- `scripts/mv_session.ahk:61` e `:82` — trocar "Fonte versionada" por uma
+- `scripts/mv_session.ahk:61` e `:81-86` — trocar "Fonte versionada" por uma
   referência que não finja ser versionada. Hoy a terceira linha do bloco já
   diz a verdade (`Fluxos/, que é gitignored e não existe neste checkout`); a
   segunda linha é que contradiz.
-- `scripts/protocolar.ahk:11-12` e `scripts/fechar_xml.ahk:16` — a referência
-  a spec inexistente deve dizer isso explicitamente, no mesmo estilo da
-  terceira linha de `mv_session.ahk`.
+- ~~`scripts/protocolar.ahk:11-12` e `scripts/fechar_xml.ahk:16`~~ — **feito.** A
+  referência a spec inexistente já diz isso explicitamente, no mesmo estilo da
+  terceira linha de `mv_session.ahk`: *"Spec previsto: .agents\workflows\…md —
+  NÃO EXISTE no repositório (.gitignore:16)"*.
 
 Um comentário de origem que aponta para o nada é pior do que nenhum
 comentário: dá a aparência de rastreabilidade que não existe.

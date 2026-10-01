@@ -34,7 +34,8 @@ caminho rápido é o que devolve `true` sem ter visto nada acontecer.
 
 ## 2. Ponto de chamada
 
-`scripts/remessa_protocolo.ahk:178-181`
+`scripts/remessa_protocolo.ahk:219-231` — **estado na época da análise**. A
+chamada usava `MV_WIN_MOVDOC_BAIXA`:
 
 ```ahk
 ; Contas coletadas no MOV DOC: fechar a tela de baixa antes de passar ao FFCV.
@@ -42,6 +43,10 @@ caminho rápido é o que devolve `true` sem ter visto nada acontecer.
 ; entre as duas janelas.
 MV_FecharUltimaTela(MV_WIN_MOVDOC_BAIXA, "MOV DOC (tela de baixa)")
 ```
+
+> **Corrigido.** Hoje a linha é `MV_FecharUltimaTela(MV_WIN_MOVDOC_ANY, ...)`
+> (`scripts/remessa_protocolo.ahk:231`) — a raiz MDI, e não a child, que é a
+> parte 2 da causa raiz deste documento.
 
 O comentário está certo e a ordem está certa. O problema está dentro de
 `MV_FecharUltimaTela`.
@@ -53,7 +58,7 @@ trata a primeira — a verificação, que faz o log mentir. A segunda, que expli
 *por que* o `^q` não funciona só no MOV DOC, é a
 [seção 5](#5-causa-raiz-parte-2-o-título-da-tela-de-baixa-está-entre-colchetes).
 
-`scripts/mv_session.ahk:513-536`
+`scripts/mv_session.ahk:546-580`
 
 ```ahk
 MV_FecharUltimaTela(winTitle, rotulo) {
@@ -73,7 +78,7 @@ MV_FecharUltimaTela(winTitle, rotulo) {
 `MV_WaitOracleSettled` é chamado, mas o que ele verifica não responde à
 pergunta que precisa ser respondida.
 
-`scripts/mv_session.ahk:542-575`
+`scripts/mv_session.ahk:563-576`
 
 ```ahk
 MV_WaitOracleSettled(winTitle, stableMs := 800, timeoutMs := 30000) {
@@ -191,7 +196,7 @@ Praxis não tem.
 
 > **Sair de tela no MV é Ctrl+Q**, confirmado pelo operador para **todas** as
 > telas […] Em AHK `^` é Ctrl, então `^q` **é** Ctrl+Q — não é valor suspeito.
-> Uma constante só: `MV_SAIR_TELA_ATALHO` (`mv_session.ahk:57`).
+> Uma constante só: `MV_SAIR_TELA_ATALHO` (`mv_session.ahk:78`).
 
 **Divergência deliberada, registrada aqui de propósito.** O fluxo validado
 acrescenta um `{Enter}` depois do `^q` na baixa
@@ -211,7 +216,7 @@ aplicação. O código segue a regra.
 ### 4.3 O envio da tecla (`Send` vs `SendInput`)
 
 **Hipótese que a observação do operador derrubou.** Havia aqui a suspeita de que
-`Send` (`mv_session.ahk:530`) não esperasse o MV processar a tecla, enquanto o
+`Send` (`mv_session.ahk:570`) não esperasse o MV processar a tecla, enquanto o
 fluxo validado usa `ActivateWindow` com `WinRestore` e `WinWaitActive`
 (`Praxis_TO-DO/Protocolar/protocolar.ahk:1075-1081`).
 
@@ -236,8 +241,8 @@ DOC** elimina a hipótese de problema de envio de tecla: se fosse o `Send` ou o
 
 | Etapa | Chamada | Constante | Valor |
 |---|---|---|---|
-| FFCV | `MV_FecharUltimaTela(MV_WIN_FFCV_ANY, "FFCV")` — `remessa_protocolo.ahk:241` | `MV_WIN_FFCV_ANY` (`mv_session.ahk:29`) | `"Faturamento ahk_exe ifrun60.EXE"` |
-| MOV DOC | `MV_FecharUltimaTela(MV_WIN_MOVDOC_BAIXA, ...)` — `remessa_protocolo.ahk:181` | `MV_WIN_MOVDOC_BAIXA` (`mv_session.ahk:32`) | `"Protocolação de Baixa de Documentos ahk_exe ifrun60.EXE"` |
+| FFCV | `MV_FecharUltimaTela(MV_WIN_FFCV_ANY, "FFCV")` — `remessa_protocolo.ahk:291` | `MV_WIN_FFCV_ANY` (`mv_session.ahk:29`) | `"Faturamento ahk_exe ifrun60.EXE"` |
+| MOV DOC | `MV_FecharUltimaTela(MV_WIN_MOVDOC_BAIXA, ...)` — `remessa_protocolo.ahk:231` | `MV_WIN_MOVDOC_BAIXA` (`mv_session.ahk:32`) | `"Protocolação de Baixa de Documentos ahk_exe ifrun60.EXE"` |
 
 As duas passam pela **mesma função**, com o **mesmo atalho**, na **mesma
 máquina**. A única diferença é a string de título.
@@ -292,7 +297,7 @@ procurava. No FFCV, casa fora dos colchetes, resolve certo.
 
 O `^q` é processado pelo **canvas do Oracle Forms, que vive na MDI child**, não
 pela raiz. `MV_FecharUltimaTela` ativa a raiz
-(`WinActivate winTitle`, `mv_session.ahk:525`) e envia `Send "^q"`. Com o foco
+(`WinActivate winTitle`, `mv_session.ahk:558`) e envia `Send "^q"`. Com o foco
 na raiz e o Forms escutando na child, o acelerador é entregue à janela que não
 o trata, e a tela não sai.
 
@@ -316,7 +321,7 @@ a diferença observada entre as duas etapas, o que as hipóteses anteriores
 MV_WIN_MOVDOC_ANY := "Movimentação ahk_exe ifrun60.EXE"
 ```
 
-Nenhuma constante nova. É literalmente o que `protocolar.ahk:1377` já usa na
+Nenhuma constante nova. É literalmente o que `protocolar.ahk:1435` já usa na
 saída do MOV DOC, e o que a etapa que funciona (FFCV) faz.
 
 **A constante `MV_WIN_MOVDOC_BAIXA` NÃO é alterada.** Uma versão anterior deste
@@ -325,15 +330,15 @@ tem quatro consumidores que dependem do título da *child*:
 
 | Consumidor | O que faz |
 |---|---|
-| `scripts/protocolar.ahk:830` | `PR_EsperarJanela` — espera a tela de baixa |
-| `scripts/protocolar.ahk:833` | `MV_EnsureWindowActive` — ativa a tela de baixa |
-| `scripts/protocolar.ahk:841` | `PR_ClicarControle(..., PR_BAIXA_BTN_RECEBIDO)` — **clica** o `Button1` "Recebido" |
+| `scripts/protocolar.ahk:878` | `PR_EsperarJanela` — espera a tela de baixa |
+| `scripts/protocolar.ahk:881` | `MV_EnsureWindowActive` — ativa a tela de baixa |
+| `scripts/protocolar.ahk:889` | `PR_ClicarControle(..., PR_BAIXA_BTN_RECEBIDO)` — **clica** o `Button1` "Recebido" |
 | `scripts/remessa_protocolo.ahk:23` | `WIN_MOVDOC_BAIXA := MV_WIN_MOVDOC_BAIXA`, usada na **leitura da grid** |
 
 A troca fica restrita a **um** ponto:
 
 ```ahk
-; scripts/remessa_protocolo.ahk:181
+; scripts/remessa_protocolo.ahk:231
 MV_FecharUltimaTela(MV_WIN_MOVDOC_ANY, "MOV DOC (tela de baixa)")
 ```
 
@@ -352,16 +357,17 @@ duas correções são complementares: uma diz *para onde* mandar, a outra diz se
 
 ## 6. Bug adjacente na mesma função: unidade de tempo
 
-`scripts/mv_session.ahk:105`
+`scripts/mv_session.ahk:128`
 
 ```ahk
 MV_TIMEOUT_ACOE     := 100
 ```
 
-O sufixo `_MS` e o valor 100 dizem milissegundos. Mas ele é passado como
-**segundos** para `MV_Poll`, cujo segundo parâmetro é `timeoutSecs`:
+O nome sugere milissegundos, ao lado de `MV_POLL_MS := 100` e
+`MV_MODULE_STABLE_MS`. Mas ele é passado como **segundos** para `MV_Poll`, cujo
+segundo parâmetro é `timeoutSecs`:
 
-`scripts/mv_session.ahk:379-388`
+`scripts/mv_session.ahk:412-418`
 
 ```ahk
 MV_Poll(condFn, timeoutSecs) {
@@ -370,7 +376,7 @@ MV_Poll(condFn, timeoutSecs) {
 
 E `MV_EnsureWindowActive` repassa direto:
 
-`scripts/mv_session.ahk:477-482`
+`scripts/mv_session.ahk:510-515`
 
 ```ahk
 MV_EnsureWindowActive(winTitle, timeoutSecs := 3) {
@@ -381,34 +387,36 @@ MV_EnsureWindowActive(winTitle, timeoutSecs := 3) {
 }
 ```
 
-Resultado: `scripts/mv_session.ahk:525`, dentro de `MV_FecharUltimaTela`,
+Resultado: `scripts/mv_session.ahk:572`, dentro de `MV_FecharUltimaTela`,
 espera **100 segundos** em vez de 0,1 s pela ativação da janela. Se a janela não
 ativar, o fluxo **pendura 100 segundos** antes de logar "a janela existe mas
 não ficou ativa".
 
 O mesmo valor é usado de forma **correta** em outros pontos, multiplicado por
-1000 para `MV_PollMs` — `scripts/fechar_xml.ahk:477`, `:510`, `:555`:
+1000 para quem espera em milissegundos — `scripts/fechar_xml.ahk:636`, `:681`,
+`:726`:
 
 ```ahk
 FX_EsperarModalFechar(MV_TIMEOUT_ACOE * 1000)
 ```
 
-Ou seja, a constante é milissegundos e dois dos consumidores a tratam
-corretamente. Os consumidores errados:
+Ou seja, a constante vale 100 e cada consumidor precisa declarar em que unidade
+trabalha. Os consumidores que passam a constante cru para uma função de
+**segundos** esperam 100 s em vez de 0,1 s:
 
 | Local | Passado como | Espera real |
 |---|---|---|
-| `scripts/mv_session.ahk:525` | segundos | 100 s |
-| `scripts/fechar_xml.ahk:348` | segundos | 100 s |
-| `scripts/fechar_xml.ahk:610` | segundos | 100 s |
-| `scripts/remessa_protocolo.ahk:1221` | segundos | 100 s |
-| `scripts/fechar_xml.ahk:477`, `:510`, `:555` | `× 1000` → ms | 100 ms |
+| `scripts/mv_session.ahk:558` | segundos (`MV_EnsureWindowActive`) | 100 s |
+| `scripts/fechar_xml.ahk:478` | segundos (`MV_Poll`) | 100 s |
+| `scripts/fechar_xml.ahk:787` | segundos (`MV_Poll`) | 100 s |
+| `scripts/remessa_protocolo.ahk:1386` | segundos (`MV_Poll`) | 100 s |
+| `scripts/fechar_xml.ahk:636`, `:681`, `:726` | `× 1000` → ms | 100 ms |
 
 Isto é mais que lentidão: no `fechar_xml.ahk`, `MV_Poll(() => !WinExist(...),
-MV_TIMEOUT_ACOE)` em `:348` e `:610` é justamente a **verificação de que a
+MV_TIMEOUT_ACOE)` em `:478` e `:787` é justamente a **verificação de que a
 tela de entrega saiu** — ou seja, a mesma verificação insuficiente de que trata
 a seção 3, agora com um timeout que só falha 100 segundos depois. E
-`remessa_protocolo.ahk:1221` é `RP_SairTelaEntrega`, a saída da tela de
+`remessa_protocolo.ahk:1386` é `RP_SairTelaEntrega`, a saída da tela de
 Entrega de Remessas, que é a mesma família de verificação.
 
 Isto reforça a recomendação central: **o que falta não é um `Sleep` maior, é
@@ -466,7 +474,7 @@ nome `MV_TIMEOUT_ACOE` sem sufixo é exatamente a ambiguidade que produziu o
 problema.
 
 Enquanto isso não for decidido, ao menos registrar que a espera de 100 s é
-intencional em `fechar_xml.ahk:348` e `:610`, onde pode ser a diferença entre
+intencional em `fechar_xml.ahk:478` e `:787`, onde pode ser a diferença entre
 "o Forms não estabilizou" e "o Forms nunca vai estabilizar".
 
 ## 8. Validação
