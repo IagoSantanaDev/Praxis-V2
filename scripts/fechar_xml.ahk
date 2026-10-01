@@ -91,14 +91,25 @@ RunFecharXML(params) {
             ; o MV recusa fechar de novo, então a remessa nunca entraria no
             ; aFechar numa segunda tentativa. O relatório sai como pendência e a
             ; fase 2 roda normalmente.
-            Notify("Remessa " remessa ": falha fatal — " resultado["erro"] " Seguindo para gerar o XML das demais.")
+            ;
+            ; E NÃO dá `break`: com [A,B,C,D] e fatal em B, C e D não eram
+            ; tentadas e não apareciam no relatório — o operador não conseguia
+            ; nem reconstruir o que faltou. A fatal é desta remessa; a lista
+            ; continua, e cada tentativa traz a tela de volta a um estado limpo
+            ; pelo FX_RecuperarTelas acima.
+            Notify("Remessa " remessa ": falha fatal — " resultado["erro"] " Seguindo para a próxima remessa.")
             pendencias.Push(Map("remessa", remessa, "motivo", resultado["erro"]))
-            break
+            continue
         }
 
         if (resultado["estado"] = "fechada") {
             fechadas++
             aFechar.Push(remessa)
+            ; Remessa fechada COM ressalva pós-fechamento (a remessa já está no
+            ; MV, mas a tela não voltou ao estado esperado). Entra no aFechar
+            ; para o XML ser gerado e vira pendência para o operador ler.
+            if (resultado["erro"] != "")
+                pendencias.Push(Map("remessa", remessa, "motivo", resultado["erro"]))
         } else {
             pendencias.Push(Map("remessa", remessa, "motivo", resultado["erro"]))
         }
@@ -363,28 +374,37 @@ FX_ConfirmarFechamento(remessa) {
 
     if FX_ResponderNaoModal() {
         ; Caminho validado: modal de confirmação → Não (não imprimir as faturas).
+        ;
+        ; Daqui para baixo a remessa JÁ ESTÁ FECHADA: o MV consumiu o "Não" e não
+        ; aceita mais fechar de novo. Nada aqui pode devolver o fluxo ao estado
+        ; anterior, então nenhuma falha pode ser "fatal" — fatal faria o laço 1
+        ; pular a remessa, ela entraria no laço 2 sem estar em aFechar, e o XML
+        ; nunca seria gerado. Na execução seguinte o MV responderia "já fechada",
+        ; que nem entra na lista. Estado de mão única: remessa fechada sem XML.
+        ; Por isso tudo aqui é pendência, e a remessa VAI para o aFechar.
         if !FX_EsperarModalFechar(MV_FINAL_ACTION_TIMEOUT_MS)
-            return FX_EstadoFechamentoFatal("Respondi Não no modal de confirmação da remessa " remessa ", mas o modal não fechou em tempo.")
+            return FX_EstadoFechadaComPendencia(remessa, "Respondi Não no modal de confirmação, mas o modal não fechou em tempo.")
 
         if !MV_Poll(() => WinExist(MV_WIN_CAPA_REMESSA), MV_TIMEOUT_LOAD)
-            return FX_EstadoFechamentoFatal("A tela de impressão da remessa " remessa " não apareceu.")
+            return FX_EstadoFechadaComPendencia(remessa, "A remessa foi fechada, mas a tela de impressão não apareceu.")
         if !MV_EnsureWindowActive(MV_WIN_CAPA_REMESSA)
-            return FX_EstadoFechamentoFatal("A tela de impressão da remessa " remessa " apareceu, mas não ficou ativa para confirmar.")
+            return FX_EstadoFechadaComPendencia(remessa, "A remessa foi fechada, mas a tela de impressão não ficou ativa para confirmar.")
         if !MV_WaitOracleSettled(MV_WIN_CAPA_REMESSA, MV_FINAL_STABLE_MS, MV_FINAL_ACTION_TIMEOUT_MS)
-            return FX_EstadoFechamentoFatal("A tela de impressão da remessa " remessa " não estabilizou antes do Enter.")
+            return FX_EstadoFechadaComPendencia(remessa, "A remessa foi fechada, mas a tela de impressão não estabilizou antes do Enter.")
 
         Send "{Enter}"
         if !MV_WaitWindowGone(MV_WIN_CAPA_REMESSA, MV_FINAL_ACTION_TIMEOUT_MS)
-            return FX_EstadoFechamentoFatal("Enviei Enter na tela de impressão da remessa " remessa ", mas ela não fechou em tempo.")
+            return FX_EstadoFechadaComPendencia(remessa, "A remessa foi fechada, mas a tela de impressão não fechou após o Enter.")
 
         if !MV_WaitOracleSettled(MV_WIN_FFCV_DATAS, MV_FINAL_STABLE_MS, MV_FINAL_ACTION_TIMEOUT_MS)
-            return FX_EstadoFechamentoFatal("Após a impressão, a tela de entrega da remessa " remessa " não estabilizou para sair.")
+            return FX_EstadoFechadaComPendencia(remessa, "A remessa foi fechada, mas a tela de entrega não estabilizou para sair.")
 
         if !FX_SairTelaEntrega()
-            return FX_EstadoFechamentoFatal("A tela de entrega da remessa " remessa " não fechou com o atalho " MV_SAIR_TELA_ATALHO ". Nenhum WinClose é forçado porque o Oracle Forms perde estado.")
+            return FX_EstadoFechadaComPendencia(remessa, "A remessa foi fechada, mas a tela de entrega não fechou com o atalho "
+                MV_SAIR_TELA_ATALHO ". Nenhum WinClose é forçado porque o Oracle Forms perde estado.")
 
         if !MV_WaitOracleSettled(MV_WIN_FFCV_ANY, MV_FINAL_STABLE_MS, MV_FINAL_ACTION_TIMEOUT_MS)
-            return FX_EstadoFechamentoFatal("O FFCV não estabilizou depois de sair da tela de entrega da remessa " remessa ".")
+            return FX_EstadoFechadaComPendencia(remessa, "A remessa foi fechada, mas o FFCV não estabilizou depois de sair da tela de entrega.")
 
         return Map("estado", "fechada", "erro", "")
     }
@@ -404,6 +424,12 @@ FX_ConfirmarFechamento(remessa) {
 ; (ambos produziam estado=fatal + erro). O do fechamento virou alias do
 ; primeiro, e os 13 call sites que o usavam continuam válidos.
 FX_EstadoFechamentoFatal(erro) => Map("estado", "fatal", "erro", erro)
+
+; Remessa já fechada no MV, com ressalva no pós-fechamento. Entra no aFechar
+; (o XML ainda precisa ser gerado) e vira pendência no relatório. Fatal seria
+; estado de mão única sem saída: a remessa nunca mais entraria numa lista.
+FX_EstadoFechadaComPendencia(remessa, motivo) =>
+    Map("estado", "fechada", "erro", "PÓS-FECHAMENTO: " motivo)
 
 FX_ResponderNaoModal() {
     ; Confirmação do FFCV: "Mensagem ao Usuário do MV 2000" com Botão1=Sim / Botão2=Não.
@@ -529,15 +555,23 @@ FX_GerarXml(remessa) {
         Notify("Aviso: a tela de XML da remessa " remessa " não confirmou estabilidade após Voltar; saindo mesmo assim.")
 
     ; Sai da tela TISS verificando que ela realmente fechou. Sem a verificação,
-    ; um Sleep fixo deixava a tela aberta e o FX_RecuperarTelas disparava um
+    ; um Sleep fixo deixava a tela aberta e o FX_RecuperarTelas dispararia um
     ; SEGUNDO Ctrl+Q sem reativar a janela — e Ctrl+Q no menu principal fecha o
     ; MV inteiro, o que derrubaria as remessas restantes do lote.
-    ; Mesma forma de FX_SairTelaEntrega: ativa, envia, espera a sumir.
+    ;
+    ; A verificação é por ASSINATURA (MV_WaitTelaSaiu), não por WinExist puro:
+    ; o Forms pode reaproveitar o mesmo HWND na troca de tela, e "a janela ainda
+    ; existe" não prova que o Ctrl+Q foi engolido. Assinatura intacta depois do
+    ; atalho = tecla engolida, e aí o único retry do FX_RecuperarTelas é
+    ; justificado; assinatura mudada = a tela já está saindo e reenviar seria
+    ; mandar Ctrl+Q para o menu principal.
+    ; Mesma forma de FX_SairTelaEntrega: ativa, envia, verifica.
     if !MV_EnsureWindowActive(MV_WIN_XML_TISS)
         Notify("Aviso: a tela XML/TISS não ficou ativa para sair; tentando o atalho mesmo assim.")
+    assinaturaTiss := MV_ScreenSignature(MV_WIN_XML_TISS)
     Send MV_SAIR_TELA_ATALHO
-    if !MV_Poll(() => !WinExist(MV_WIN_XML_TISS), MV_FINAL_ACTION_TIMEOUT_MS)
-        Notify("Aviso: a tela XML/TISS não confirmou saída após " MV_SAIR_TELA_ATALHO ".")
+    if !MV_WaitTelaSaiu(MV_WIN_XML_TISS, assinaturaTiss, MV_FINAL_STABLE_MS, MV_FINAL_ACTION_TIMEOUT_MS)
+        Notify("Aviso: a tela XML/TISS não confirmou saída após " MV_SAIR_TELA_ATALHO ". A recuperação vai tentar de novo.")
 
     if !FileExist(xmlPath)
         return Map("estado", "erro", "erro", "O MV não criou o arquivo " xmlPath ". Confira o relatório do TISS.")
