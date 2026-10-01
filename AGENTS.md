@@ -182,7 +182,7 @@ Erros aqui não dão erro visível: produzem tela errada, planilha errada ou rem
 - **`#Include` é textual e transitivo.** `scripts/mv_session.ahk` já vem incluído por
   `scripts/remessa_protocolo.ahk:7`. **Não re-inclua** `mv_session.ahk` em `protocolar.ahk` ou
   `fechar_xml.ahk`: duplica todas as funções `MV_*` e o build quebra.
-- **`gScripts` em `main.ahk:30` está duplicado em `devSim()` dentro de `ui/index.html:423`.** Alterar
+- **`gScripts` em `main.ahk:30` está duplicado em `devSim()` dentro de `ui/index.html:425`.** Alterar
   `id`, `label`, `tipo`, `obrigatorio`, `opcoes` ou `default` de um parâmetro exige editar **os
   dois** lugares, senão a UI em modo dev mostra o formulário errado.
 - **Os três fluxos existem em código; só um rodou no MV.** `remessa_protocolo.ahk` é o validado.
@@ -195,7 +195,7 @@ Erros aqui não dão erro visível: produzem tela errada, planilha errada ou rem
   Se você não rodou, diga isso explicitamente em vez de afirmar que funciona.
 - **Sair de tela no MV é Ctrl+Q**, confirmado pelo operador para **todas** as telas; no menu
   principal fecha o MV. Em AHK `^` é Ctrl, então `^q` **é** Ctrl+Q — não é valor suspeito. Uma
-  constante só: `MV_SAIR_TELA_ATALHO` (`mv_session.ahk:57`). `{Esc}` foi descartado. Não "conserte"
+  constante só: `MV_SAIR_TELA_ATALHO` (`mv_session.ahk:78`). `{Esc}` foi descartado. Não "conserte"
   por adivinhação. O fluxo validado acrescenta `{Enter}` depois do `^q` na baixa
   (`Praxis_TO-DO/Protocolar/protocolar.ahk:1124`); o Praxis **não** faz isso, por decisão do
   operador. Não "conserte" para incluir o `{Enter}`.
@@ -215,25 +215,33 @@ Erros aqui não dão erro visível: produzem tela errada, planilha errada ou rem
   (`MV_ScreenSignature`, inclui título) antes e depois, e `MV_WaitTelaSaiu` só aceita como
   sucesso a janela sumida **ou** a assinatura mudada. Regra geral: **estabilidade não prova
   transição**; exija uma assinatura que inclua o título, e nunca reporte sucesso sem ela.
+  `PR_EsperarJanelaEstavel` (`protocolar.ahk:1271`) foi corrigido pelo mesmo motivo: comparava
+  só a contagem de controles, que não muda na troca de tela do Forms.
 - **`PR_JanelaVisivel` mascarava o bit errado** (`protocolar.ahk`): testava `0x1000000`, que é
   `WS_MAXIMIZE`, com o comentário dizendo `WS_VISIBLE` (que é `0x10000000`). Reprovava toda janela
   normal — inclusive o diálogo "Salvar como" — e desligava em silêncio 5 dos 6 fallbacks de
-  `PR_EsperarPopupRemessa` **e** `PR_EsperarPopupMv`, que é o que detectava erro por conta no
+  `PR_EsperarPopupRemessa` **e** `PR_EsperarPopupMv`, que é o que detectava popup por conta no
   Protocolar: sem ele, **toda conta era contada como aceita** e `PR_TratarPopup` nunca rodava.
   Bit de estilo Win32: confira o valor, não confie no comentário. `WinGetStyle` é o único jeito
   de testar visibilidade, e o valor certo é `0x10000000`.
+- **No Protocolar não existe "conta recusada".** `PR_TratarPopup` tem **dois** ramos de recuperação
+  (documento pendente e setor divergente) e um de **não reconhecido** — e só esses. Não existe
+  ramo de recusa, e nenhum caminho do Protocolar conta uma conta como recusada: conta sem popup é
+  **aceita**. Um popup reconhecido é corrigido e reprocessado; um popup não reconhecido **trava o
+  lote**. Texto que diga o contrário faz alguém "corrigir" `PR_TratarPopup` procurando um ramo de
+  recusa que não existe.
 - **`MV_ClickBySpec` degrada para clique cego por coordenada** quando o `ClassNN` não casa
-  (`mv_session.ahk:654`): tenta `MV_ClickControlAt`, e se falhar clica no ponto `(x, y)` e devolve
+  (`mv_session.ahk:760`): tenta `MV_ClickControlAt`, e se falhar clica no ponto `(x, y)` e devolve
   `true` do mesmo jeito. Um `ClassNN` errado vira **ação errada sem erro**. Não é possível, pelo
   retorno, distinguir clique no controle de clique na coordenada. Prefira `MV_ClickFirstControl`
   (sem coordenada) quando só o `ClassNN` importa.
-- **Todo fim de fluxo fecha a última tela**, via `MV_FecharUltimaTela` (`mv_session.ahk:513`). Duas
+- **Todo fim de fluxo fecha a última tela**, via `MV_FecharUltimaTela` (`mv_session.ahk:546`). Duas
   exceções: popup do MV aberto (não fechar — o operador precisa ler a mensagem) e
   `imprimir_salvar_envio = Não` no protocolar (deixar o MOV DOC aberto para conferência).
 - **Recuperação no meio do fluxo não fecha o MV.** No `protocolar`, `PR_FecharPendencias()` limpa
   telas auxiliares; `PR_RecuperarTelas(cfg)` fecha o MV e só pode ser chamada no fim. Fechar o MV no
   meio quebra a execução.
-- **`{Down 121}` em `protocolar.ahk:90` (`PR_RELATORIO_DOWN_N`) é posicional** e nunca foi
+- **`{Down 121}` em `protocolar.ahk:94` (`PR_RELATORIO_DOWN_N`) é posicional** e nunca foi
   validado: depende da ordenação do relatório na estação do hospital. Se mudar lá, o fluxo gera a
   planilha errada sem erro visível.
 - **`#Include *i build\generated\*.ahk` é opcional e case-insensitive.** Em dev o app funciona sem
@@ -278,10 +286,10 @@ Erros aqui não dão erro visível: produzem tela errada, planilha errada ou rem
   passa por OCR: `FFCV_ResolveOcrRegion` + `FFCV_RunOcrProbe` (`lib/FFCV_ErrorTemplates.ahk`) contra
   os textos canônicos de `lib/FFCV_ErrorReferences.json`. Não porte servidor OCR próprio.
 - **Popups "Informações da Conta" e afins não têm título próprio:** são detectados pelo sentinela
-  `ui60Drawn W323` dentro da janela FFCV (`remessa_protocolo.ahk:73`).
+  `ui60Drawn W323` dentro da janela FFCV (`remessa_protocolo.ahk:95`).
 - **`WinClose` é proibido no `ifrun60.EXE`** (o Oracle Forms perde estado da aplicação) — mas é
   **permitido** no `RWRBE60.EXE` ("Operação de Fundo dos Relatórios"), onde é a forma correta de
-  limpar os relatórios pendentes (`protocolar.ahk:983`).
+  limpar os relatórios pendentes (`protocolar.ahk:1033`, `PR_FecharRelatoriosDeFundo`).
 - **Fluxo é autônomo:** sem `Gui`, `MsgBox`, `ToolTip` ou hotkey. Saída só por `Notify()`,
   `Progress()`, `Done()` e o abort do módulo.
 - **Toda constante nova registra a origem** (regra 9): linha `; Spy em ...` acima do bloco.
@@ -290,9 +298,10 @@ Atalhos de menu já confirmados contra o MV2000i — não rederive, não troque 
 
 | Atalho | Abre | Onde está no código |
 |---|---|---|
-| `{Alt down}mpb{Alt up}` | MOV DOC → Protocolação de Baixa | `remessa_protocolo.ahk:267`, `protocolar.ahk:828` |
-| `{Alt down}lm{Alt up}{Enter}` | FFCV → Manutenção de Remessa | `remessa_protocolo.ahk:601`, `fechar_xml.ahk:168` |
-| `MV_TISS_ATALHO` = `{Alt down}lmm{Enter}{Alt up}` | FFCV → Monitoração de Faturamento TISS | `scripts/mv_session.ahk:53` |
+| `{Alt down}mpb{Alt up}` | MOV DOC → Protocolação de Baixa | `remessa_protocolo.ahk:338`, `protocolar.ahk:876` |
+| `{Alt down}lm{Alt up}{Enter}` | FFCV → Manutenção de Remessa | `remessa_protocolo.ahk:719` (só este fluxo usa; o `fechar_xml.ahk` removeu o hop) |
+| `MV_TISS_ATALHO` = `{Alt down}lmm{Enter}{Alt up}` | FFCV → Monitoração de Faturamento TISS | `scripts/mv_session.ahk:67` |
+| `{Alt down}l{e}{Alt up}` | FFCV → Entrega de Remessas | `MV_ENTREGA_REMESSAS_ALTALHO`, `mv_session.ahk:72`. **Alt fica pressionado durante o `e`**: soltar entre as teclas faz o mnemônico não casar e a tela não abre, sem erro visível |
 
 ## Commits
 
