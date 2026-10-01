@@ -8,6 +8,12 @@
 
 #Include lib\WebView2.ahk
 #Include lib\JSON.ahk
+
+SendToUI(data) {
+    global gWebView
+    gWebView.PostWebMessageAsJson(JSON.stringify(data))
+}
+
 #Include scripts\remessa_protocolo.ahk
 #Include scripts\protocolar.ahk
 #Include scripts\fechar_xml.ahk
@@ -267,11 +273,6 @@ OnJsMessage(handler, args) {
         case "stop_script": StopScript()
         case "exit":        ExitApp()
     }
-}
-
-SendToUI(data) {
-    global gWebView
-    gWebView.PostWebMessageAsJson(JSON.stringify(data))
 }
 
 ; ─── App bootstrap ────────────────────────────────────────────

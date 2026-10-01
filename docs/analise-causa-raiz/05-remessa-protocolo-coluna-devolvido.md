@@ -1,4 +1,4 @@
-# Remessa por Protocolo — ler a coluna "Devolvido" e não enviar a conta
+# Remessa por Protocolo — ler "Devolvido" e "Recebido" por linha
 
 > TO-DO de origem: `Praxis_TO-DO/Remessa_Protocolo/TO-DO.txt:1`
 > *"Vamos adicionar uma nova verificação para a etapa no MOV DOC ( Movimentação
@@ -7,23 +7,31 @@
 > "Devolvida" utilizando as imagens na sub-pasta (images/1), e se tiver
 > marcada como "Devolvida" o macro deve pular aquela conta/linha."*
 
-**Natureza:** feature. **Status:** implementada. **Correção do operador:** a
-conta devolvida é um **AVISO**, não um erro — não impede a execução.
+**Natureza:** feature. **Status:** implementada; a validação comportamental
+depende de execução no MV2000i real.
 
 ---
 
 ## 1. Decisões do operador
 
-Três pontos foram definidos pelo operador e mudam a implementação:
+As regras definidas pelo operador:
 
 1. **O `ClassNN` do checkbox é fixo por linha.** Não é renumerado; o Forms
-   numera de baixo para cima uma única vez. O mapa está na seção 2.
-2. **A verificação acontece ANTES de copiar as linhas.** Ler os 4 checkboxes
-   primeiro, e só depois copiar conta/convênio das linhas que não são devolvidas.
-3. **É aviso, não erro.** A conta devolvida é registrada e exibida no fim da
-   execução, em **amarelo**, e não interrompe nada.
+   numera de baixo para cima uma única vez. Os mapas estão na seção 2.
+2. Em cada página, ler primeiro os quatro estados **Devolvido**. Só depois ler
+   **Recebido** nas linhas não devolvidas. O controle Recebido de uma linha
+   devolvida nunca é consultado nem clicado.
+3. Uma linha devolvida não vai ao FFCV; as demais continuam no fluxo, inclusive
+   as que já estavam recebidas.
+4. Se uma leitura de estado não for `0` ou `1`, interromper o lote sem salvar o
+   protocolo atual. Não assumir um estado seguro.
+5. Marcar como recebidas somente as linhas não devolvidas e ainda não recebidas.
+   O protocolo continua sendo salvo uma única vez com `F10`, depois da coleta.
+6. Contas devolvidas seguem como avisos, não como erro. Contas já recebidas são
+   registradas somente no log operacional.
 
-O ponto 2 não é estilo: é o que impede a linha 1 de escapar. Ver seção 4.
+Ler os estados antes de copiar a grid impede que a linha-semente escape das
+verificações. Ver seção 4.
 
 ## 2. O mapa linha → ClassNN
 
@@ -46,6 +54,23 @@ MOVDOC_CHECK_DEVOLVIDO_CLASSES := ["Button5", "Button4", "Button3", "Button2"]
 documento propôs prefixo de classe + geometria, partindo da premissa de que o
 `ClassNN` variava com a rolagem. Não varia. A premissa estava errada e a
 implementação também.
+
+O mapa de **Recebido**, confirmado pelo operador no Window Spy:
+
+| Linha | ClassNN |
+|---|---|
+| 1ª | `Button9` |
+| 2ª | `Button8` |
+| 3ª | `Button7` |
+| 4ª | `Button6` |
+
+```ahk
+MOVDOC_CHECK_RECEBIDO_CLASSES := ["Button9", "Button8", "Button7", "Button6"]
+```
+
+O clique de Recebido usa `MV_ClickFirstControl` com o `ClassNN` exato. É a
+exceção solicitada pelo operador ao padrão de clique com ponto Client; não se
+usa fallback para coordenada.
 
 ## 3. A leitura
 
@@ -74,44 +99,41 @@ return ""
 `ClassNN` por igualdade exata antes de ler o estado. Não depende de coordenada,
 posição, tolerância ou prefixo de classe.
 
-`ControlGetChecked` funciona em checkbox do Oracle Forms: é o mesmo mecanismo
-do checkbox "Recebido" (`MOVDOC_CHECK_RECEBIDO_CLASS`, lido por
-`MV_ControlCheckedAt`), e `remessa_protocolo.ahk` rodou contra o MV2000i.
-Isso dispensa leitura por pixel e OCR — o tick é desenhado pelo Forms, mas o
-estado do controle é exposto.
+`ControlGetChecked` é usado para ler os dois estados. Isso dispensa leitura por
+pixel e OCR — o tick é desenhado pelo Forms, mas o estado do controle é exposto.
 
-### 3.1 Três estados, e o ilegível não é devolvida
+### 3.1 Estados e falhas de leitura
 
 | Retorno | Significado | O que o fluxo faz |
 |---|---|---|
-| `1` | devolvida | não envia; registra **aviso** |
-| `0` | não devolvida | segue normal |
-| `""` | não encontrou / não leu | segue como **não** devolvida + aviso no log |
+| `1` em Devolvido | linha devolvida | não lê Recebido, não clica e não envia ao FFCV; registra aviso |
+| `0` em Devolvido | linha não devolvida | lê o estado Recebido |
+| `1` em Recebido | já recebida | não clica; segue ao FFCV e registra no log |
+| `0` em Recebido | ainda não recebida | clica no controle correspondente; segue ao FFCV |
+| `""` ou outro estado | não encontrou / não leu | interrompe o lote sem enviar `F10` para o protocolo atual |
 
-O `""` ser tratado como "não devolvida" é deliberado e o motivo é o custo do
-erro em cada direção. Tratar como devolvida **descartaria uma conta válida** —
-o operador perderia faturamento sem o sistema avisar. Tratar como não devolvida
-deixa passar um caso, e ele aparece no log. O erro caro é o do lado que descarta
-dinheiro sem sinal.
+Contas já recebidas continuam sendo enviadas ao FFCV; esse estado só evita um
+segundo clique. A falha de leitura é fatal porque prosseguir poderia marcar ou
+enviar uma linha com estado desconhecido.
 
-## 4. Por que ler os 4 antes de copiar
+## 4. Leitura e processamento da página
 
-A grid entra no fluxo por **dois** caminhos, e a linha 1 é um deles.
+Depois do F8, `RP_WaitMovDocFirstGridLineReady` lê os quatro estados Devolvido
+antes de ler conta e convênio da primeira linha. Quando a linha está legível,
+lê Recebido somente nas linhas não devolvidas. Os estados iniciais e a linha
+semente são passados a `RP_ColetarLinhasMovDoc`.
 
-**A semente.** Depois do F8, `RP_WaitMovDocFirstGridLineReady` lê primeiro os
-quatro estados de Devolvido e só então tenta ler conta e convênio da primeira
-linha. A linha e essa amostra dos checkboxes são passadas a
-`RP_ColetarLinhasMovDoc`; a linha 1 só entra em `linhas` depois de ser filtrada.
+Em cada página, `RP_ColetarLinhasVisiveisMovDoc` repete a sequência: lê
+Devolvido para todas as quatro linhas; valida esses estados; lê Recebido apenas
+para as não devolvidas; lê conta/convênio; então clica somente o Recebido que
+estava desmarcado. Uma falha de leitura retorna ao chamador e interrompe o lote
+antes do `F10`.
 
-**O laço.** `RP_ColetarLinhasVisiveisMovDoc` lê as 4 linhas visíveis, pagina,
-e repete até 100 vezes.
-
-Na primeira coleta, `RP_ColetarLinhasVisiveisMovDoc` reutiliza a amostra feita
-antes da leitura da linha-semente. Após cada rolagem, lê os quatro checkboxes
-novamente antes de copiar conta ou convênio das linhas visíveis.
-
-A chave de dedupe `vistos` usa `protocolo "|" conta "|" convenio` e é montada em
-dois lugares (a semente e o laço). Os dois precisam continuar iguais.
+Após cada rolagem, os estados são lidos novamente. Contas já recebidas são
+identificadas no log depois da leitura da conta. Linhas recebidas e não
+devolvidas permanecem na lista que alimenta o FFCV. A chave de dedupe `vistos`
+usa `protocolo "|" conta "|" convenio` e impede cliques repetidos nas linhas
+que reapareçam durante a paginação.
 
 ## 5. Onde a conta devolvida é registrada
 
@@ -155,7 +177,8 @@ existem em um lugar só. A duplicação não é tocada.
 
 ### 6.2 Exige o MV2000i real — obrigatório
 
-1. Protocolo com **nenhuma** devolvida: nada muda, todas as contas seguem.
+1. Protocolo sem devolvidas e com todas já recebidas: nenhum clique, todas as
+   contas seguem ao FFCV.
 2. Protocolo com **uma** devolvida na 3ª linha (é o caso das capturas): a conta
    não aparece no FFCV e a linha aparece em AVISOS, em amarelo.
 3. Protocolo com a devolvida na **1ª linha**: é o caso que a linha-semente
@@ -166,12 +189,18 @@ existem em um lugar só. A duplicação não é tocada.
    avança (`RP_AvancarGridMovDocQuatroLinhas`).
 6. Todas devolvidas: o fluxo aborta com a mensagem que lista os avisos, e não com
    "Convênio não identificado" genérico.
+7. Recebida já marcada: não clicar, registrar no log e continuar incluindo a
+   conta no FFCV.
+8. Recebida desmarcada: clicar somente no botão mapeado à linha.
+9. Devolvida: não ler nem clicar Recebido nessa linha; a conta não segue ao
+   FFCV.
+10. Leitura ilegível de Devolvido ou Recebido: interromper o lote sem executar
+    `F10` para o protocolo atual.
+11. Confirmar um único `F10` por protocolo, mesmo que várias linhas sejam
+    marcadas individualmente.
 
 ## 7. PENDENTE
 
-- **A leitura é estável antes do clique na conta.** O Devolvido é lido antes de
-  qualquer clique na conta, o que é a ordem correta por construção — mas se o
-  Forms só atualizar o checkbox após o foco passar pela linha, a leitura vem
-  adiantada. Observar na primeira execução.
-- **O que fazer quando a conta devolvida também é a única do convênio.** Hoje o
-  fluxo aborta. É o comportamento correto, mas vale confirmar com o operador.
+- Executar os casos da seção 6.2 no MV2000i real, principalmente a correlação
+  entre linha visível e `Button9`…`Button6`, a paginação e a persistência após
+  `F10`. Build e integrity-check não provam o comportamento do Oracle Forms.
