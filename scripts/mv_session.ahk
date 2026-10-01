@@ -69,7 +69,9 @@ MV_TISS_ATALHO := "{Alt down}lmm{Enter}{Alt up}"
 ; direto do menu do FFCV. Confirmado pelo fluxo validado em
 ; Praxis_TO-DO/Fechar&XML/Fechar&XML.ahk:140 e :175, que usa exatamente este
 ; atalho para abrir e para reabrir a tela entre as remessas.
-MV_ENTREGA_REMESSAS_ALTALHO := "{Alt down}l{Alt up}e"
+; O Alt fica pressionado durante o "e": soltar entre as duas teclas faz o
+; mnemônico não casar e a tela não abre, sem erro visível.
+MV_ENTREGA_REMESSAS_ALTALHO := "{Alt down}l{e}{Alt up}"
 ; Saída de tela no MV2000i. Confirmado pelo operador: Ctrl+Q vale para TODAS as telas.
 ; No menu principal fecha o MV. Em AHK, "^q" É a notação de Ctrl+Q — não ajustar.
 ; {Esc} foi descartado: não sai da tela de Entrega de Remessas.
@@ -791,18 +793,29 @@ MV_NormalizarDataBr(valor) {
     valor := Trim(valor)
     if !RegExMatch(valor, MV_DATA_REGEX_ISO, &m)
         return valor
-    return FormatTime(RegExReplace(m[0], "\D") "000000", MV_DATA_FORMATO_FFCV)
+
+    ; FormatTime devolve VAZIO — sem exceção — para data inexistente: ano abaixo
+    ; de 1601 (o timestamp de 14 dígitos não é válido), mês/dia fora de faixa e
+    ; 29/02 em ano não bissexto. Medido neste AHK. Sem esta guarda o campo ia
+    ; receber string vazia, o FFCV aceitaria a tela em branco e a data real
+    ; nunca chegaria ao MV. Mesma doutrina do resto da função: o valor
+    ; irrecuperável segue cru para o FFCV recusar na frente do operador.
+    normalizada := FormatTime(RegExReplace(m[0], "\D") "000000", MV_DATA_FORMATO_FFCV)
+    return (normalizada = "") ? valor : normalizada
 }
 
 ; Lê de volta o texto de um campo de data já preenchido na tela do MV e compara
 ; com o valor que foi enviado. É o que impede um formato divergente de passar
 ; em silêncio: o operador vê a divergência no log, no momento do preenchimento.
+; Só a IDA é normalizada. Normalizar os dois lados anula a conferência inteira:
+; o FFCV aceita ISO cru, então "2026-02-28" na tela normalizava para o mesmo
+; dd/MM/yyyy do enviado e devolvia "ok" com o operador vendo o formato errado.
 ; Não recebe classNN porque MV_ReadEditAtPoint já resolve por prefixo "Edit".
 MV_CompararDataTela(winTitle, clientX, clientY, valorEnviado, tolerance := 14) {
     naTela := MV_ReadEditAtPoint(winTitle, clientX, clientY, "", tolerance)
     if (naTela = "")
         return "nao lida"
-    if (MV_NormalizarDataBr(naTela) = MV_NormalizarDataBr(valorEnviado))
+    if (naTela = MV_NormalizarDataBr(valorEnviado))
         return "ok"
     return "divergente: tela=" naTela " enviado=" valorEnviado
 }
