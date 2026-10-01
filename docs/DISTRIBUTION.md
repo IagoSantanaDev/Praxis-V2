@@ -76,7 +76,7 @@ Use quando quiser assinar os binários, mas sem ativar todas as regras estritas 
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\tools\build-praxis.ps1 `
-  -Version 1.3.0 `
+  -Version 1.4.0 `
   -CertificateThumbprint "THUMBPRINT_DO_CERTIFICADO" `
   -RequireCodeSigning
 ```
@@ -89,7 +89,7 @@ Use para qualquer entrega que deva ser tratada como release real.
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\tools\build-praxis.ps1 `
-  -Version 1.3.0 `
+  -Version 1.4.0 `
   -CertificateThumbprint "THUMBPRINT_DO_CERTIFICADO" `
   -Release
 ```
@@ -136,31 +136,31 @@ Certificado autoassinado é útil para testes e ambiente interno controlado, mas
 
 ## Artefatos gerados
 
-Para a versão `1.3.0`, o build completo gera:
+Para a versão `1.4.0`, o build completo gera:
 
 ```text
-dist\Praxis-1.3.0\stage\Praxis.exe
-dist\Praxis-1.3.0\stage\lib\64bit\WebView2Loader.dll
-dist\Praxis-1.3.0\installer\Praxis-Setup-1.3.0.exe
-dist\Praxis-1.3.0\delivery\Praxis-Setup-1.3.0.exe
-dist\Praxis-1.3.0\distribution\Praxis.exe
-dist\Praxis-1.3.0\distribution\lib\64bit\WebView2Loader.dll
-dist\Praxis-1.3.0\distribution\LICENSE
-dist\Praxis-1.3.0\distribution\COPYRIGHT
-dist\Praxis-1.3.0\distribution\NOTICE.md
-dist\Praxis-1.3.0\distribution\EULA.md
-dist\Praxis-1.3.0\distribution\NDA.md
-dist\Praxis-1.3.0\distribution\PRIVACY_LGPD.md
-dist\Praxis-1.3.0\distribution\THIRD_PARTY_NOTICES.md
-dist\Praxis-1.3.0\delivery\LICENSE
-dist\Praxis-1.3.0\delivery\COPYRIGHT
-dist\Praxis-1.3.0\delivery\NOTICE.md
-dist\Praxis-1.3.0\delivery\EULA.md
-dist\Praxis-1.3.0\delivery\NDA.md
-dist\Praxis-1.3.0\delivery\PRIVACY_LGPD.md
-dist\Praxis-1.3.0\delivery\THIRD_PARTY_NOTICES.md
-dist\Praxis-1.3.0\Praxis-build-manifest.json
-dist\Praxis-1.3.0\Praxis-installer-manifest.json
+dist\Praxis-1.4.0\stage\Praxis.exe
+dist\Praxis-1.4.0\stage\lib\64bit\WebView2Loader.dll
+dist\Praxis-1.4.0\installer\Praxis-Setup-1.4.0.exe
+dist\Praxis-1.4.0\delivery\Praxis-Setup-1.4.0.exe
+dist\Praxis-1.4.0\distribution\Praxis.exe
+dist\Praxis-1.4.0\distribution\lib\64bit\WebView2Loader.dll
+dist\Praxis-1.4.0\distribution\LICENSE
+dist\Praxis-1.4.0\distribution\COPYRIGHT
+dist\Praxis-1.4.0\distribution\NOTICE.md
+dist\Praxis-1.4.0\distribution\EULA.md
+dist\Praxis-1.4.0\distribution\NDA.md
+dist\Praxis-1.4.0\distribution\PRIVACY_LGPD.md
+dist\Praxis-1.4.0\distribution\THIRD_PARTY_NOTICES.md
+dist\Praxis-1.4.0\delivery\LICENSE
+dist\Praxis-1.4.0\delivery\COPYRIGHT
+dist\Praxis-1.4.0\delivery\NOTICE.md
+dist\Praxis-1.4.0\delivery\EULA.md
+dist\Praxis-1.4.0\delivery\NDA.md
+dist\Praxis-1.4.0\delivery\PRIVACY_LGPD.md
+dist\Praxis-1.4.0\delivery\THIRD_PARTY_NOTICES.md
+dist\Praxis-1.4.0\Praxis-build-manifest.json
+dist\Praxis-1.4.0\Praxis-installer-manifest.json
 ```
 
 O staging agora é sanitizado para runtime: contém apenas o executável compilado, o loader WebView2 e os documentos legais que o instalador também instala. A pasta `distribution` é a entrega portátil para computadores que não aceitam instalador; ela não expõe `.ahk`, `.ps1`, `.html` ou `.json`.

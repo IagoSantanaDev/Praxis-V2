@@ -14,9 +14,19 @@ SendToUI(data) {
     gWebView.PostWebMessageAsJson(JSON.stringify(data))
 }
 
+; ─── Fluxos ───────────────────────────────────────────────────
+; SOMENTE o fluxo 01 (RP_*) está validado contra o MV2000i real, e é o único
+; habilitado. Os outros dois ficam de fora do EXE de propósito:
+;   - protocolar.ahk (PR_*) nunca rodou no MV e nem abre: o #Include da linha 3
+;     aponta para lib/globals/mv/ParseUtils.ahk, que não existe neste repo.
+;   - os dois abrem Gui própria no TOPO do arquivo (BuildGui() + return), e um
+;     return no topo de um arquivo incluído aborta o script inteiro — incluí-los
+;     aqui mataria o AppInit() antes de a janela aparecer.
+; Reativar = desembrulhar estas linhas E os dois cases de RunScript(), junto.
+; Atenção ao nome do arquivo: o & é literal (fechar&xml.ahk), não "ou".
+; Include scripts\protocolar.ahk
+; Include scripts\fechar&xml.ahk
 #Include scripts\remessa_protocolo.ahk
-#Include scripts\protocolar.ahk
-#Include scripts\fechar_xml.ahk
 
 SetTitleMatchMode 2
 
@@ -253,8 +263,10 @@ RunScript(scriptId, params) {
 
     switch scriptId {
         case "remessa_protocolo": RunRemessaProtocolo(params)
-        case "protocolar":        RunProtocolar(params)
-        case "fechar_xml":        RunFecharXML(params)
+        ; Fluxos sem validação no MV2000i real: as inclusões acima estão desligadas
+        ; e RunProtocolar/RunFecharXML não existem em lugar nenhum do repo.
+        ; case "protocolar":        RunProtocolar(params)
+        ; case "fechar_xml":        RunFecharXML(params)
         default:
             SendToUI(Map("type","error","message","Script desconhecido: " . scriptId))
             gRunning := false
