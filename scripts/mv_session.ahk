@@ -420,7 +420,7 @@ MV_Poll(condFn, timeoutSecs) {
     }
 }
 
-MV_WaitWindowStable(winTitle, stableMs := 600, timeoutSecs := 20) {
+MV_WaitWindowStable(winTitle, stableMs := 300, timeoutSecs := 20) {
     startedAt := A_TickCount
     stableSince := 0
     lastCount := -1
