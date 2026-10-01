@@ -5,15 +5,15 @@
 ; não o código-fonte AutoHotkey. Isso reduz exposição, mas não impede engenharia reversa.
 
 #ifndef AppVersion
-#define AppVersion "1.2.0"
+#define AppVersion "1.3.0"
 #endif
 
 #ifndef SourceDir
-#define SourceDir "..\dist\Praxis-1.2.0\stage"
+#define SourceDir "..\dist\Praxis-1.3.0\stage"
 #endif
 
 #ifndef OutputDir
-#define OutputDir "..\dist\Praxis-1.2.0\installer"
+#define OutputDir "..\dist\Praxis-1.3.0\installer"
 #endif
 
 #ifndef AssetsDir
@@ -21,7 +21,7 @@
 #endif
 
 #ifndef AppVersionInfoVersion
-#define AppVersionInfoVersion "1.2.0.0"
+#define AppVersionInfoVersion "1.3.0.0"
 #endif
 
 #ifndef WebView2BootstrapperUrl
