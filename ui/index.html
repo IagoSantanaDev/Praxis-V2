@@ -6,23 +6,23 @@
 <link rel="icon" href="data:,">
 <style>
 :root {
-  --win-bg:      #D4D0C8;
-  --win-face:    #ECE9D8;
-  --win-bdr-dk:  #808080;
+  --win-bg:      #F3F5F2;
+  --win-face:    #F7F9F8;
+  --win-bdr-dk:  #B9C2BD;
   --win-bdr-lt:  #FFFFFF;
-  --win-bdr-mid: #ACA899;
-  --header:      #003366;
-  --accent:      #0055A5;
-  --accent-dk:   #003B8C;
-  --txt:         #000000;
-  --txt-muted:   #666;
+  --win-bdr-mid: #CFD7D2;
+  --header:      #163B3B;
+  --accent:      #145D65;
+  --accent-dk:   #0E4B51;
+  --txt:         #1F2A27;
+  --txt-muted:   #52615D;
   --input-bg:    #FFFFFF;
-  --log-bg:      #0D1117;
-  --log-ok:      #3FB950;
-  --log-info:    #58A6FF;
-  --log-warn:    #D29922;
-  --log-err:     #F85149;
-  --font:        Tahoma, 'MS Sans Serif', Arial, sans-serif;
+  --log-bg:      #101A1A;
+  --log-ok:      #1A7F5A;
+  --log-info:    #1F6FB5;
+  --log-warn:    #B77A2C;
+  --log-err:     #B8403C;
+  --font:        'Segoe UI', Tahoma, Arial, sans-serif;
   --fs:          12px;
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -82,21 +82,21 @@ body {
 /* Sidebar */
 #sidebar {
   width: 185px; min-width: 140px; background: var(--win-face);
-  border-right: 2px inset var(--win-bdr-mid);
+  border-right: 1px solid var(--win-bdr-mid);
   display: flex; flex-direction: column; overflow: hidden; flex-shrink: 0;
 }
-.sb-hdr { background: var(--accent); color: #fff; padding: 5px 8px; font-size: 11px; font-weight: bold; flex-shrink: 0; }
+.sb-hdr { background: var(--header); color: #fff; padding: 7px 10px; font-size: 11px; font-weight: 600; flex-shrink: 0; letter-spacing: .04em; }
 #script-list { flex: 1; overflow-y: auto; }
 .cat-lbl {
-  background: #C0BDB5; padding: 3px 8px; font-size: 10px; font-weight: bold;
-  color: #333; text-transform: uppercase; letter-spacing: .5px;
-  border-top: 1px solid var(--win-bdr-mid); border-bottom: 1px solid var(--win-bdr-lt);
+  background: #E9EFED; padding: 5px 10px; font-size: 10px; font-weight: 700;
+  color: var(--txt-muted); text-transform: uppercase; letter-spacing: .08em;
+  border-bottom: 1px solid var(--win-bdr-mid);
 }
 .s-item {
-  padding: 7px 10px 7px 20px; border-bottom: 1px solid #DDD9D0;
-  cursor: pointer; font-size: 11px; display: flex; align-items: center; gap: 5px;
+  padding: 9px 10px; border-bottom: 1px solid #E3E9E7; cursor: pointer; font-size: 11px;
+  display: flex; align-items: center; gap: 6px; color: var(--txt);
 }
-.s-item:hover  { background: #E0EDF8; color: var(--accent); }
+.s-item:hover  { background: #EEF5F5; color: var(--header); }
 .s-item.active { background: var(--accent); color: #fff; }
 
 /* Content */
@@ -123,13 +123,15 @@ body {
 
 .form-input,
 .form-select {
-  height: 21px; padding: 1px 5px; border: 1px solid #7F9DB9;
+  height: 24px; padding: 1px 6px; border: 1px solid #BCC9C4;
   font-family: var(--font); font-size: 11px; background: var(--input-bg);
-  width: 100%; outline: none; color: var(--txt);
+  width: 100%; outline: none; color: var(--txt); border-radius: 4px;
 }
-.form-input:focus, .form-select:focus { border-color: var(--accent); background: #EEF5FF; }
+.form-input:focus, .form-select:focus { border-color: var(--accent); background: #F2F8F8; box-shadow: inset 0 0 0 1px rgba(20,93,101,.12); }
 .form-select { cursor: pointer; }
-.form-hint { font-size: 9px; color: #999; }
+.form-hint { font-size: 9px; color: var(--txt-muted); }
+.form-check-wrap { display: inline-flex; align-items: center; gap: 8px; min-height: 24px; color: var(--txt); }
+.form-check { width: 15px; height: 15px; accent-color: var(--accent); }
 
 /* Separador de seção opcional */
 .form-section-sep {
@@ -184,16 +186,16 @@ body {
   </div>
 
   <div id="toolbar">
-    <button class="tb-btn run"  id="btn-run"  onclick="runScript()"  disabled>▶ Executar</button>
-    <button class="tb-btn stop" id="btn-stop" onclick="stopScript()" disabled>⏹ Parar</button>
+    <button class="tb-btn run"  id="btn-run"  onclick="runScript()"  disabled>Executar</button>
+    <button class="tb-btn stop" id="btn-stop" onclick="stopScript()" disabled>Parar</button>
     <div class="tb-sep"></div>
-    <button class="tb-btn" onclick="clearLog()">🗑 Limpar Log</button>
-    <button class="tb-btn" onclick="clearForm()">↺ Limpar</button>
+    <button class="tb-btn" onclick="clearLog()">Limpar Log</button>
+    <button class="tb-btn" onclick="clearForm()">Limpar</button>
   </div>
 
   <div id="main">
     <div id="sidebar">
-      <div class="sb-hdr">📋 Módulos Praxis</div>
+      <div class="sb-hdr">Módulos Praxis</div>
       <div id="script-list"></div>
     </div>
     <div id="content">
@@ -310,7 +312,7 @@ function renderForm(script) {
   required.forEach(p => { html += renderField(p); });
 
   if (optional.length > 0) {
-    html += `<hr class="form-section-sep"><label class="form-label" style="color:#999;font-size:10px;">Opcional</label><div></div>`;
+    html += `<hr class="form-section-sep"><label class="form-label" style="color:var(--txt-muted);font-size:10px;">Opcional</label><div></div>`;
     optional.forEach(p => { html += renderField(p); });
   }
 
@@ -327,6 +329,12 @@ function renderField(p) {
       `<option value="${o}"${o === p.default ? ' selected' : ''}>${o}</option>`).join('');
     input = `<select class="form-select" id="p-${p.id}"${req?' required':''}>
                <option value="">-- Selecione --</option>${opts}</select>`;
+  } else if (p.tipo === 'checkbox') {
+    const checked = p.default !== false;
+    input = `<label class="form-check-wrap">
+              <input class="form-check" type="checkbox" id="p-${p.id}" ${checked ? 'checked' : ''}>
+              <span>${esc(hint || 'Ativar')}</span>
+             </label>`;
   } else {
     input = `<input class="form-input" type="${p.tipo}" id="p-${p.id}"
              ${req?'required':''} ${hint?`placeholder="${esc(hint)}"`:''}>`;
@@ -336,19 +344,28 @@ function renderField(p) {
     <label class="form-label${req?' req':''}" for="p-${p.id}">${esc(p.label)}</label>
     <div class="form-field">
       ${input}
-      ${hint && p.tipo !== 'select' ? `<span class="form-hint">${esc(hint)}</span>` : ''}
+      ${hint && p.tipo !== 'select' && p.tipo !== 'checkbox' ? `<span class="form-hint">${esc(hint)}</span>` : ''}
     </div>`;
 }
 
 function clearForm() {
   if (!current) return;
-  current.params.forEach(p => { const el = document.getElementById(`p-${p.id}`); if(el) el.value=''; });
+  current.params.forEach(p => {
+    const el = document.getElementById(`p-${p.id}`);
+    if (!el) return;
+    if (p.tipo === 'checkbox') el.checked = p.default !== false;
+    else el.value = '';
+  });
 }
 
 function collectParams() {
   const params = {};
   for (const p of current.params) {
     const el  = document.getElementById(`p-${p.id}`);
+    if (p.tipo === 'checkbox') {
+      params[p.id] = !!el?.checked;
+      continue;
+    }
     const val = el?.value?.trim() ?? '';
     if (p.obrigatorio && !val) {
       appendLog(`Campo obrigatório não preenchido: ${p.label}`, 'w');
@@ -435,28 +452,7 @@ function devSim(data) {
           { id:'tipo_conta',     label:'Tipo de Conta',        tipo:'select',obrigatorio:true,
             opcoes:['Internamento','Ambulatório','Emergência'] },
           { id:'num_remessa',    label:'Remessa Existente',    tipo:'text',  obrigatorio:false, hint:'Deixe vazio para criar nova' },
-          { id:'data_entrega',   label:'Data de Entrega',      tipo:'date',  obrigatorio:false },
-          { id:'data_vencimento',label:'Data de Vencimento',   tipo:'date',  obrigatorio:false }
-        ]
-      },
-      { id:'protocolar', nome:'Protocolar', categoria:'Movimentação',
-        descricao:'Movimenta contas de remessas para outro setor',
-        params:[
-          { id:'remessas',    label:'Número das Remessas', tipo:'text', obrigatorio:true,  hint:'Ex: 511458, 514015' },
-          { id:'setor_atual', label:'Setor Atual',         tipo:'text', obrigatorio:true,  hint:'Ex: 34' },
-          { id:'setor_envio', label:'Setor de Envio',      tipo:'text', obrigatorio:true,  hint:'Ex: 365' },
-          { id:'tipo',         label:'Tipo',                tipo:'select',obrigatorio:true,
-            opcoes:['Ambulatorial','Hospitalar'] },
-          { id:'imprimir_salvar_envio', label:'Imprimir, Salvar e Enviar', tipo:'select',obrigatorio:true,
-            opcoes:['Sim','Não'], default:'Sim' }
-        ]
-      },
-      { id:'fechar_xml', nome:'Fechar e Gerar XML', categoria:'Faturamento',
-        descricao:'Fecha remessas e gera arquivo XML',
-        params:[
-          { id:'remessas',       label:'Número das Remessas', tipo:'text', obrigatorio:true, hint:'Ex: 511458, 514015' },
-          { id:'data_entrega',   label:'Data de Entrega',     tipo:'date', obrigatorio:true },
-          { id:'data_vencimento',label:'Data de Vencimento',  tipo:'date', obrigatorio:true }
+          { id:'imprimir_relatorio', label:'Imprimir relatório ao encerrar', tipo:'checkbox', obrigatorio:false, default:true }
         ]
       }
     ]

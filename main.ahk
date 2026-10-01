@@ -49,48 +49,8 @@ global gScripts := [
             Map("id","num_remessa",    "label","Remessa Existente",
                 "tipo","text",   "obrigatorio",false,
                 "hint","Deixe vazio para criar nova"),
-            Map("id","data_entrega",   "label","Data de Entrega",
-                "tipo","date",   "obrigatorio",false),
-            Map("id","data_vencimento","label","Data de Vencimento",
-                "tipo","date",   "obrigatorio",false)
-        ]
-    ),
-    Map(
-        "id",        "protocolar",
-        "nome",      "Protocolar",
-        "categoria", "Movimentação",
-        "descricao", "Movimenta contas de remessas para outro setor",
-        "params", [
-            Map("id","remessas",    "label","Número das Remessas",
-                "tipo","text",  "obrigatorio",true,
-                "hint","Ex: 511458, 514015"),
-            Map("id","setor_atual", "label","Setor Atual",
-                "tipo","text",  "obrigatorio",true,
-                "hint","Ex: 34"),
-            Map("id","setor_envio", "label","Setor de Envio",
-                "tipo","text",  "obrigatorio",true,
-                "hint","Ex: 365"),
-            Map("id","tipo",        "label","Tipo",
-                "tipo","select", "obrigatorio",true,
-                "opcoes",["Ambulatorial","Hospitalar"]),
-            Map("id","imprimir_salvar_envio", "label","Imprimir, Salvar e Enviar",
-                "tipo","select", "obrigatorio",true,
-                "opcoes",["Sim","Não"], "default","Sim")
-        ]
-    ),
-    Map(
-        "id",        "fechar_xml",
-        "nome",      "Fechar e Gerar XML",
-        "categoria", "Faturamento",
-        "descricao", "Fecha remessas e gera arquivo XML",
-        "params", [
-            Map("id","remessas",      "label","Número das Remessas",
-                "tipo","text", "obrigatorio",true,
-                "hint","Ex: 511458, 514015"),
-            Map("id","data_entrega",  "label","Data de Entrega",
-                "tipo","date", "obrigatorio",true),
-            Map("id","data_vencimento","label","Data de Vencimento",
-                "tipo","date", "obrigatorio",true)
+            Map("id","imprimir_relatorio", "label","Imprimir relatório do fechamento",
+                "tipo","checkbox", "obrigatorio",false, "default",true)
         ]
     )
 ]
