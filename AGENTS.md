@@ -31,6 +31,10 @@ Consulte o Context7 antes de qualquer decisão sobre framework, biblioteca, depe
 ferramenta, configuração, arquitetura ou recurso de linguagem. Não decida por memória nem por
 familiaridade.
 
+Use-o para consultar a documentação da versão em uso, comparar opções e expor
+incompatibilidades, limitações, riscos e recursos obsoletos, e avaliar qual solução é a mais
+adequada a este projeto.
+
 IDs que resolvem para este projeto:
 
 | Assunto | Library ID |
@@ -159,7 +163,8 @@ pendente, porque o erro fica silencioso.
 ## 8. Higiene do repositório
 
 Antes de commit ou entrega, revise arquivos temporários, cache, log, build local, backup,
-credencial e artefato de agente. Não versione o que é local, transitório, sensível ou gerado.
+credencial e artefato de agente. Não versione o que é local, transitório, sensível ou gerado —
+salvo o que for necessário para build, execução, documentação ou rastreabilidade.
 
 O `.gitignore` já cobre `dist/`, `build/`, `config.ini`, `*.log`, `*.xml`, `*.exe`, `*.pfx` e
 `Fluxos/`. Ele **também** ignora `.claude/`, `.cursor/`, `.codex/`, `.windsurf/`, `.roo/` e
