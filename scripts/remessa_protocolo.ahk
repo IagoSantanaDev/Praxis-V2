@@ -132,14 +132,9 @@ RP_XML_QUERY_MIN_WAIT_MS       := MV_XML_QUERY_MIN_WAIT_MS
 RunRemessaProtocolo(params) {
     global gRunning
 
-    protocolos := ParseProtocolos(params["protocolos"])
-    tipoConta   := params["tipo_conta"]
-    numRemessa := Trim(params["num_remessa"])
-    imprimirRelatorio := params.Has("imprimir_relatorio") ? params["imprimir_relatorio"] : true
-    if (Type(imprimirRelatorio) = "String") {
-        valor := StrLower(Trim(imprimirRelatorio))
-        imprimirRelatorio := (valor = "true" || valor = "1" || valor = "sim" || valor = "yes")
-    }
+    protocolos   := ParseProtocolos(params["protocolos"])
+    tipoConta    := params["tipo_conta"]
+    numRemessa   := Trim(params["num_remessa"])
 
     if (protocolos.Length = 0)
         return RP_Abort("Informe ao menos um protocolo.")
@@ -254,25 +249,20 @@ RunRemessaProtocolo(params) {
 
     Progress(87)
 
-    if (imprimirRelatorio) {
-        stageStart := A_TickCount
-        Notify("Imprimindo relatório de atendimentos...")
-        if !FinalizarSemDatas()
-            return RP_Abort("Não consegui imprimir o relatório de atendimentos no FFCV.")
-        RP_RecordTiming(timings, "Impressão do relatório", stageStart)
-    } else {
-        stageStart := A_TickCount
-        Notify("Relatório desativado: apenas fecha o popup de envio e mantém o FFCV aberto.")
-        RP_RecordTiming(timings, "Finalização sem relatório", stageStart)
-    }
+    ; O retorno de FinalizarSemDatas é descartado de propósito: a falha da
+    ; impressão já sai no log pelo Notify de ImprimirRelatorioAtendimentos, e o
+    ; relatório final é o mesmo com ou sem impressão. Abortar aqui jogaria fora
+    ; a remessa que o MV já fechou, com as contas já dentro dela.
+    stageStart := A_TickCount
+    FinalizarSemDatas()
+    RP_RecordTiming(timings, "Finalização sem datas", stageStart)
 
     Progress(100)
     RP_RecordTiming(timings, "Total do fluxo", totalStart, protocolos.Length " protocolo(s), " totalContasFFCV " conta(s)")
     timingReport := RP_FormatTimingReport(timings)
     gRunning := false
 
-    if (imprimirRelatorio)
-        MV_FecharUltimaTela(MV_WIN_FFCV_ANY, "FFCV")
+    MV_FecharUltimaTela(MV_WIN_FFCV_ANY, "FFCV")
 
     ; Avisos e pendências são seções separadas e de cores diferentes: uma conta
     ; devolvida é um AVISO (o MV decidiu isso, não é falha), enquanto pendência de

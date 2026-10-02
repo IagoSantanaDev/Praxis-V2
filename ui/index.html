@@ -130,8 +130,6 @@ body {
 .form-input:focus, .form-select:focus { border-color: var(--accent); background: #F2F8F8; box-shadow: inset 0 0 0 1px rgba(20,93,101,.12); }
 .form-select { cursor: pointer; }
 .form-hint { font-size: 9px; color: var(--txt-muted); }
-.form-check-wrap { display: inline-flex; align-items: center; min-height: 24px; color: var(--txt); }
-.form-check { width: 13px; height: 13px; accent-color: var(--accent); margin: 0; }
 
 /* Separador de seção opcional */
 .form-section-sep {
@@ -333,11 +331,6 @@ function renderField(p) {
       `<option value="${o}"${o === p.default ? ' selected' : ''}>${o}</option>`).join('');
     input = `<select class="form-select" id="p-${p.id}"${req?' required':''}>
                <option value="">-- Selecione --</option>${opts}</select>`;
-  } else if (p.tipo === 'checkbox') {
-    const checked = p.default !== false;
-    input = `<label class="form-check-wrap">
-              <input class="form-check" type="checkbox" id="p-${p.id}" ${checked ? 'checked' : ''}>
-             </label>`;
   } else {
     input = `<input class="form-input" type="${p.tipo}" id="p-${p.id}"
              ${req?'required':''} ${hint?`placeholder="${esc(hint)}"`:''}>`;
@@ -347,7 +340,7 @@ function renderField(p) {
     <label class="form-label${req?' req':''}" for="p-${p.id}">${esc(p.label)}</label>
     <div class="form-field">
       ${input}
-      ${hint && p.tipo !== 'select' && p.tipo !== 'checkbox' ? `<span class="form-hint">${esc(hint)}</span>` : ''}
+      ${hint && p.tipo !== 'select' ? `<span class="form-hint">${esc(hint)}</span>` : ''}
     </div>`;
 }
 
@@ -355,9 +348,7 @@ function clearForm() {
   if (!current) return;
   current.params.forEach(p => {
     const el = document.getElementById(`p-${p.id}`);
-    if (!el) return;
-    if (p.tipo === 'checkbox') el.checked = p.default !== false;
-    else el.value = '';
+    if (el) el.value = '';
   });
 }
 
@@ -365,10 +356,6 @@ function collectParams() {
   const params = {};
   for (const p of current.params) {
     const el  = document.getElementById(`p-${p.id}`);
-    if (p.tipo === 'checkbox') {
-      params[p.id] = !!el?.checked;
-      continue;
-    }
     const val = el?.value?.trim() ?? '';
     if (p.obrigatorio && !val) {
       appendLog(`Campo obrigatório não preenchido: ${p.label}`, 'w');
@@ -454,8 +441,7 @@ function devSim(data) {
           { id:'protocolos',     label:'Protocolos',           tipo:'text',  obrigatorio:true,  hint:'Ex: 12345, 67890' },
           { id:'tipo_conta',     label:'Tipo de Conta',        tipo:'select',obrigatorio:true,
             opcoes:['Internamento','Ambulatório','Emergência'] },
-          { id:'num_remessa',    label:'Remessa Existente',    tipo:'text',  obrigatorio:false, hint:'Deixe vazio para criar nova' },
-          { id:'imprimir_relatorio', label:'Imprimir relatório ao encerrar', tipo:'checkbox', obrigatorio:false, default:true }
+          { id:'num_remessa',    label:'Remessa Existente',    tipo:'text',  obrigatorio:false, hint:'Deixe vazio para criar nova' }
         ]
       }
     ]
